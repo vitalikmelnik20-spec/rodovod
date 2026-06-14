@@ -1,14 +1,18 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Background, Controls, MiniMap,
   useNodesState, useEdgesState, useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
+import { io } from 'socket.io-client';
 import 'reactflow/dist/style.css';
 import PersonNode from '../components/tree/PersonNode';
 import { buildGraphElements } from '../components/tree/treeLayout';
+import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const nodeTypes = { personNode: PersonNode };
 
@@ -45,6 +49,7 @@ function TreeFlow({ persons, relationships, onAddPerson }) {
 export default function TreePage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const token = useAuthStore(s => s.accessToken);
   const [tree, setTree] = useState(null);
   const [persons, setPersons] = useState([]);
   const [relationships, setRelationships] = useState([]);
@@ -52,8 +57,24 @@ export default function TreePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ first_name: '', last_name: '' });
   const [adding, setAdding] = useState(false);
+  const socketRef = useRef(null);
 
   useEffect(() => { loadAll(); }, [id]);
+
+  useEffect(() => {
+    const socket = io(API_BASE, { auth: { token } });
+    socketRef.current = socket;
+    socket.emit('join-tree', id);
+
+    socket.on('person:created', (p) => setPersons(prev => [...prev, p]));
+    socket.on('person:updated', (p) => setPersons(prev => prev.map(x => x.id === p.id ? p : x)));
+    socket.on('person:deleted', ({ id: pid }) => setPersons(prev => prev.filter(x => x.id !== pid)));
+
+    return () => {
+      socket.emit('leave-tree', id);
+      socket.disconnect();
+    };
+  }, [id]);
 
   async function loadAll() {
     try {
