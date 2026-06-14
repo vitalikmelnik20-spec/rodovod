@@ -40,12 +40,13 @@ router.post('/telegram', async (req, res) => {
     const telegramUser = verifyTelegramInitData(init_data);
     if (!telegramUser) return res.status(401).json({ error: 'Invalid Telegram data' });
 
+    console.log('[auth] telegramUser:', JSON.stringify(telegramUser));
     const user = await upsertUser(telegramUser);
     const tokens = generateTokens(user.telegram_id);
     res.json({ user, ...tokens });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('[auth/telegram] error:', err.message);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
