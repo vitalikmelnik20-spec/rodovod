@@ -16,6 +16,7 @@ const eventsRoutes = require('./routes/events');
 const chatRoutes = require('./routes/chat');
 const historyRoutes = require('./routes/history');
 const memoryRoutes = require('./routes/memory');
+const proposalsRoutes = require('./routes/proposals');
 
 const app = express();
 const httpServer = createServer(app);
@@ -45,6 +46,8 @@ app.use('/api/trees', eventsRoutes);
 app.use('/api/trees', chatRoutes);
 app.use('/api/trees', historyRoutes);
 app.use('/api/trees', memoryRoutes);
+app.use('/api/trees', proposalsRoutes);
+app.use('/api', proposalsRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV }));
 

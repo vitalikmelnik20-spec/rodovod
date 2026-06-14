@@ -464,6 +464,72 @@ bot.callbackQuery(/^notif:(.+)$/, async (ctx) => {
   await ctx.reply(`⚙️ Сповіщення: *${labels[type] || type}*`, { parse_mode: 'Markdown' });
 });
 
+// ─── Callback: approve/reject пропозиції ─────────────────────────────────────
+
+bot.callbackQuery(/^approve:(.+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery('Обробляємо...');
+  if (!await ensureAuth(ctx)) return;
+  const propId = ctx.match[1];
+  const token = fsm.getToken(ctx.from.id);
+  try {
+    await api.approveProposal(propId, token);
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text + '\n\n✅ *Схвалено*',
+      { parse_mode: 'Markdown' }
+    );
+  } catch (err) {
+    await ctx.reply(`❌ Помилка: ${err.error || 'перевірте права'}`);
+  }
+});
+
+bot.callbackQuery(/^reject:(.+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  if (!await ensureAuth(ctx)) return;
+  const propId = ctx.match[1];
+  fsm.setState(ctx.from.id, 'reject_reason', { propId, msgText: ctx.callbackQuery.message.text });
+  await ctx.reply('✏️ Вкажіть причину відхилення (або "без причини"):', { reply_markup: new InlineKeyboard().text('Без причини', 'reject_no_reason') });
+});
+
+bot.callbackQuery('reject_no_reason', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const data = fsm.getData(ctx.from.id);
+  fsm.clearState(ctx.from.id);
+  const token = fsm.getToken(ctx.from.id);
+  try {
+    await api.rejectProposal(data.propId, null, token);
+    await ctx.reply('❌ Пропозицію відхилено');
+  } catch (err) {
+    await ctx.reply(`❌ Помилка: ${err.error || 'перевірте права'}`);
+  }
+});
+
+// ─── Callback: /proposals (список) ───────────────────────────────────────────
+
+bot.command('proposals', async (ctx) => {
+  if (!await ensureAuth(ctx)) return;
+  const tree = fsm.getCurrentTree(ctx.from.id);
+  if (!tree.id) return ctx.reply('Спочатку оберіть дерево через /trees');
+
+  const token = fsm.getToken(ctx.from.id);
+  try {
+    const proposals = await api.getProposals(tree.id, token);
+    if (!proposals.length) return ctx.reply('📋 Немає активних пропозицій');
+
+    for (const p of proposals.slice(0, 5)) {
+      const personName = [p.person_last, p.person_first].filter(Boolean).join(' ') || 'Без імені';
+      const who = p.username ? `@${p.username}` : p.first_name;
+      const action = p.action === 'delete' ? '🗑 Видалення' : '✏️ Редагування';
+      const msg = `${action}: *${personName}*\nВід: ${who}`;
+      const kb = new InlineKeyboard()
+        .text('✅ Схвалити', `approve:${p.id}`)
+        .text('❌ Відхилити', `reject:${p.id}`);
+      await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+    }
+  } catch {
+    await ctx.reply('❌ Помилка. Можливо, у вас немає прав адміна.');
+  }
+});
+
 // ─── Callback: cancel / skip ─────────────────────────────────────────────────
 
 bot.callbackQuery('cancel', async (ctx) => {
@@ -491,6 +557,19 @@ async function handleTextFSM(ctx, text) {
   const token = fsm.getToken(userId);
 
   if (!state) return;
+
+  // ── Причина відхилення ────────────────────────────────────────────────────
+  if (state === 'reject_reason') {
+    const { propId } = data;
+    fsm.clearState(userId);
+    try {
+      await api.rejectProposal(propId, text || null, token);
+      await ctx.reply('❌ Пропозицію відхилено');
+    } catch {
+      await ctx.reply('❌ Помилка відхилення');
+    }
+    return;
+  }
 
   // ── Створення дерева ──────────────────────────────────────────────────────
   if (state === 'create_tree') {

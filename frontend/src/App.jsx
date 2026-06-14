@@ -12,6 +12,7 @@ import ChatPage from './pages/ChatPage';
 import HistoryPage from './pages/HistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import MembersPage from './pages/MembersPage';
+import ProposalsPage from './pages/ProposalsPage';
 import JoinPage from './pages/JoinPage';
 import Layout from './components/layout/Layout';
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="tree/:id/history" element={<HistoryPage />} />
         <Route path="tree/:id/settings" element={<SettingsPage />} />
         <Route path="tree/:id/members" element={<MembersPage />} />
+        <Route path="tree/:id/proposals" element={<ProposalsPage />} />
       </Route>
     </Routes>
   );

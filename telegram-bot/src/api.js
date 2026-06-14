@@ -33,4 +33,8 @@ module.exports = {
   createRelationship: (treeId, data, token) => request('POST', `/trees/${treeId}/relationships`, data, token),
 
   getHistory: (treeId, token) => request('GET', `/trees/${treeId}/history`, null, token),
+
+  getProposals: (treeId, token) => request('GET', `/trees/${treeId}/proposals`, null, token),
+  approveProposal: (propId, token) => request('PUT', `/proposals/${propId}/approve`, {}, token),
+  rejectProposal: (propId, note, token) => request('PUT', `/proposals/${propId}/reject`, { note }, token),
 };

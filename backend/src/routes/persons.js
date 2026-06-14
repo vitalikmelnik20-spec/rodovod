@@ -90,8 +90,14 @@ router.post('/:id/persons', requireAuth, requireTreeRole(['admin', 'editor']), a
   }
 });
 
-// PUT /api/trees/:id/persons/:pid
+// PUT /api/trees/:id/persons/:pid — тільки адмін, редактор використовує /propose
 router.put('/:id/persons/:pid', requireAuth, requireTreeRole(['admin', 'editor']), async (req, res) => {
+  if (req.userRole === 'editor') {
+    return res.status(403).json({
+      error: 'Editors must use /propose endpoint',
+      code: 'USE_PROPOSE',
+    });
+  }
   const { first_name, last_name, patronymic, birth_date, death_date,
     birth_place, living_place, biography, is_alive, tags } = req.body;
 
@@ -138,7 +144,7 @@ router.put('/:id/persons/:pid', requireAuth, requireTreeRole(['admin', 'editor']
   }
 });
 
-// DELETE /api/trees/:id/persons/:pid
+// DELETE /api/trees/:id/persons/:pid — тільки адмін
 router.delete('/:id/persons/:pid', requireAuth, requireTreeRole(['admin']), async (req, res) => {
   const client = await getClient();
   try {

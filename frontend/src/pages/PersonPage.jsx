@@ -20,14 +20,19 @@ export default function PersonPage() {
   const { id: treeId, pid } = useParams();
   const navigate = useNavigate();
   const [person, setPerson] = useState(null);
+  const [role, setRole] = useState(null);
   const [related, setRelated] = useState([]);
   const [allPersons, setAllPersons] = useState([]);
-  const [rels, setRels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('info');
+
+  // Edit/propose state
   const [editField, setEditField] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [proposeSuccess, setProposeSuccess] = useState(false);
+
+  // Relationship modal
   const [showRelModal, setShowRelModal] = useState(false);
   const [relType, setRelType] = useState('parent_child');
   const [relSearch, setRelSearch] = useState('');
@@ -37,35 +42,78 @@ export default function PersonPage() {
 
   async function loadAll() {
     try {
-      const [personRes, personsRes, relsRes] = await Promise.all([
+      const [personRes, personsRes, relsRes, treeRes] = await Promise.all([
         api.get(`/trees/${treeId}/persons/${pid}`),
         api.get(`/trees/${treeId}/persons`),
         api.get(`/trees/${treeId}/relationships`),
+        api.get(`/trees/${treeId}`),
       ]);
       setPerson(personRes.data);
+      setRole(treeRes.data.role);
       setAllPersons(personsRes.data);
-      setRels(relsRes.data);
 
       const myRels = relsRes.data.filter(r => r.person_a_id === pid || r.person_b_id === pid);
       const relatedIds = myRels.map(r => r.person_a_id === pid ? r.person_b_id : r.person_a_id);
-      const relatedPersons = personsRes.data
-        .filter(p => relatedIds.includes(p.id))
-        .map(p => ({ ...p, relType: myRels.find(r => r.person_a_id === p.id || r.person_b_id === p.id)?.relation_type }));
-      setRelated(relatedPersons);
+      setRelated(
+        personsRes.data
+          .filter(p => relatedIds.includes(p.id))
+          .map(p => ({ ...p, relType: myRels.find(r => r.person_a_id === p.id || r.person_b_id === p.id)?.relation_type }))
+      );
     } catch { }
     setLoading(false);
   }
 
+  function openField(field, raw, value) {
+    setEditField(field);
+    setEditValue(raw ?? value ?? '');
+    setProposeSuccess(false);
+  }
+
   async function saveField() {
     setSaving(true);
+    const val = editField === 'birth_date' || editField === 'death_date' ? (editValue || null) : editValue;
     try {
-      const val = editField === 'birth_date' || editField === 'death_date'
-        ? (editValue || null) : editValue;
-      const res = await api.put(`/trees/${treeId}/persons/${pid}`, { [editField]: val });
-      setPerson(res.data);
-      setEditField(null);
+      if (role === 'admin') {
+        const res = await api.put(`/trees/${treeId}/persons/${pid}`, { [editField]: val });
+        setPerson(res.data);
+        setEditField(null);
+      } else {
+        await api.post(`/trees/${treeId}/persons/${pid}/propose`, { [editField]: val });
+        setProposeSuccess(true);
+        setTimeout(() => { setEditField(null); setProposeSuccess(false); }, 1500);
+      }
     } catch { }
     setSaving(false);
+  }
+
+  async function saveBio() {
+    setSaving(true);
+    try {
+      if (role === 'admin') {
+        const res = await api.put(`/trees/${treeId}/persons/${pid}`, { biography: editValue });
+        setPerson(res.data);
+        setEditField(null);
+      } else {
+        await api.post(`/trees/${treeId}/persons/${pid}/propose`, { biography: editValue });
+        setProposeSuccess(true);
+        setTimeout(() => { setEditField(null); setProposeSuccess(false); }, 1500);
+      }
+    } catch { }
+    setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (role === 'editor') {
+      try {
+        await api.post(`/trees/${treeId}/persons/${pid}/propose-delete`);
+        navigate(`/tree/${treeId}`);
+      } catch { }
+      return;
+    }
+    try {
+      await api.delete(`/trees/${treeId}/persons/${pid}`);
+      navigate(`/tree/${treeId}`);
+    } catch { }
   }
 
   async function addRelationship(targetId) {
@@ -80,20 +128,6 @@ export default function PersonPage() {
     setAddingRel(false);
   }
 
-  async function deletePerson() {
-    if (!window.confirm?.('Видалити цю особу?')) {
-      try {
-        await api.delete(`/trees/${treeId}/persons/${pid}`);
-        navigate(`/tree/${treeId}`);
-      } catch { }
-      return;
-    }
-    try {
-      await api.delete(`/trees/${treeId}/persons/${pid}`);
-      navigate(`/tree/${treeId}`);
-    } catch { }
-  }
-
   if (loading || !person) return (
     <div className="flex items-center justify-center h-screen bg-slate-900">
       <div className="text-4xl animate-pulse">👤</div>
@@ -102,15 +136,19 @@ export default function PersonPage() {
 
   const name = [person.last_name, person.first_name, person.patronymic].filter(Boolean).join(' ') || 'Без імені';
   const initials = [person.first_name, person.last_name].filter(Boolean).map(s => s[0]).join('') || '?';
+  const canEdit = role === 'admin' || role === 'editor';
+  const isEditor = role === 'editor';
 
   const filteredPersons = allPersons.filter(p =>
     p.id !== pid &&
     [p.first_name, p.last_name].filter(Boolean).join(' ').toLowerCase().includes(relSearch.toLowerCase())
   );
 
+  const saveLabel = isEditor ? (saving ? '...' : '📨 Запропонувати') : (saving ? '...' : 'Зберегти');
+
   return (
     <div className="min-h-screen bg-slate-900 pb-20">
-      {/* Header з фото */}
+      {/* Header */}
       <div className="relative">
         <div className="h-48 bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center">
           {person.avatar_url ? (
@@ -122,30 +160,40 @@ export default function PersonPage() {
           )}
         </div>
 
-        {/* Back button */}
         <button onClick={() => navigate(-1)}
-          className="absolute top-3 left-3 w-9 h-9 bg-black/40 backdrop-blur rounded-xl flex items-center justify-center text-white">
+          className="absolute top-3 left-3 w-9 h-9 bg-black/40 backdrop-blur rounded-xl flex items-center justify-center text-white text-xl">
           ‹
         </button>
 
-        {/* Delete button */}
-        <button onClick={deletePerson}
-          className="absolute top-3 right-3 w-9 h-9 bg-black/40 backdrop-blur rounded-xl flex items-center justify-center text-lg">
-          🗑
-        </button>
+        {/* Admin: proposals badge */}
+        {role === 'admin' && (
+          <button onClick={() => navigate(`/tree/${treeId}/proposals`)}
+            className="absolute top-3 right-12 px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/40 rounded-xl text-yellow-400 text-xs font-semibold">
+            📋 Пропозиції
+          </button>
+        )}
 
-        {/* Ім'я */}
+        {canEdit && (
+          <button onClick={handleDelete}
+            className="absolute top-3 right-3 w-9 h-9 bg-black/40 backdrop-blur rounded-xl flex items-center justify-center text-lg">
+            {isEditor ? '📨' : '🗑'}
+          </button>
+        )}
+
         <div className="absolute bottom-0 left-0 right-0 px-4 pb-3 bg-gradient-to-t from-slate-900">
           <h1 className="text-white text-xl font-bold">{name}</h1>
           <div className="flex items-center gap-2 mt-0.5">
             <span className={`text-xs px-2 py-0.5 rounded-full ${person.is_alive ? 'bg-green-900/60 text-green-400' : 'bg-slate-700 text-slate-400'}`}>
               {person.is_alive ? '🟢 Живий/а' : '⚫️ Помер/ла'}
             </span>
+            {isEditor && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900/60 text-blue-400">редактор</span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Таби */}
+      {/* Tabs */}
       <div className="flex gap-1 px-4 mt-4 mb-4 bg-slate-800 mx-4 rounded-2xl p-1">
         {[['info', 'Інфо'], ['family', 'Родина'], ['bio', 'Біографія']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
@@ -155,8 +203,15 @@ export default function PersonPage() {
         ))}
       </div>
 
+      {/* Editor hint */}
+      {isEditor && (
+        <div className="mx-4 mb-3 px-3 py-2 bg-blue-900/30 border border-blue-800/50 rounded-xl">
+          <p className="text-blue-300 text-xs">Ви редактор. Зміни потребують схвалення адміністратора.</p>
+        </div>
+      )}
+
       <div className="px-4">
-        {/* Таб Інфо */}
+        {/* Info tab */}
         {tab === 'info' && (
           <div className="flex flex-col gap-2">
             {[
@@ -167,26 +222,29 @@ export default function PersonPage() {
               { field: 'death_date', label: 'Смерть', value: fmtDate(person.death_date), raw: person.death_date, type: 'date' },
               { field: 'birth_place', label: 'Місце нар.', value: person.birth_place },
               { field: 'living_place', label: 'Місце прож.', value: person.living_place },
-            ].map(({ field, label, value, raw, type }) => (
-              <div key={field} className="bg-slate-800 rounded-2xl px-4 py-3 flex items-center justify-between"
-                onClick={() => { setEditField(field); setEditValue(raw || value || ''); }}>
+            ].map(({ field, label, value, raw }) => (
+              <div key={field}
+                className={`bg-slate-800 rounded-2xl px-4 py-3 flex items-center justify-between ${canEdit ? 'cursor-pointer active:scale-[0.98] transition-all' : ''}`}
+                onClick={() => canEdit && openField(field, raw, value)}>
                 <div className="flex-1 min-w-0">
                   <p className="text-slate-400 text-xs mb-0.5">{label}</p>
                   <p className="text-white text-sm truncate">{value || <span className="text-slate-600">—</span>}</p>
                 </div>
-                <span className="text-slate-600 ml-2">✏️</span>
+                {canEdit && <span className="text-slate-600 ml-2">{isEditor ? '📨' : '✏️'}</span>}
               </div>
             ))}
           </div>
         )}
 
-        {/* Таб Родина */}
+        {/* Family tab */}
         {tab === 'family' && (
           <div>
-            <button onClick={() => setShowRelModal(true)}
-              className="w-full bg-blue-600 text-white font-semibold py-3 rounded-2xl mb-4 active:scale-95 transition-all">
-              ➕ Додати зв'язок
-            </button>
+            {canEdit && (
+              <button onClick={() => setShowRelModal(true)}
+                className="w-full bg-blue-600 text-white font-semibold py-3 rounded-2xl mb-4 active:scale-95 transition-all">
+                ➕ Додати зв'язок
+              </button>
+            )}
             {related.length === 0 ? (
               <div className="text-center py-8 text-slate-500">Немає зв'язків</div>
             ) : related.map(p => {
@@ -210,53 +268,70 @@ export default function PersonPage() {
           </div>
         )}
 
-        {/* Таб Біографія */}
+        {/* Bio tab */}
         {tab === 'bio' && (
           <div>
             {editField === 'biography' ? (
               <div>
                 <textarea value={editValue} onChange={e => setEditValue(e.target.value)} rows={8}
                   className="w-full bg-slate-800 text-white rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" />
+                {proposeSuccess && (
+                  <p className="text-green-400 text-sm text-center mt-2">✅ Пропозицію надіслано!</p>
+                )}
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => setEditField(null)} className="flex-1 bg-slate-700 text-white py-3 rounded-2xl">Скасувати</button>
-                  <button onClick={saveField} disabled={saving} className="flex-1 bg-blue-600 text-white py-3 rounded-2xl">Зберегти</button>
+                  <button onClick={saveBio} disabled={saving}
+                    className={`flex-1 py-3 rounded-2xl font-semibold ${isEditor ? 'bg-yellow-600 text-white' : 'bg-blue-600 text-white'}`}>
+                    {saving ? '...' : (isEditor ? '📨 Запропонувати' : 'Зберегти')}
+                  </button>
                 </div>
               </div>
             ) : (
-              <div onClick={() => { setEditField('biography'); setEditValue(person.biography || ''); }}
-                className="bg-slate-800 rounded-2xl p-4 min-h-32 cursor-pointer">
+              <div onClick={() => canEdit && openField('biography', person.biography, person.biography)}
+                className={`bg-slate-800 rounded-2xl p-4 min-h-32 ${canEdit ? 'cursor-pointer' : ''}`}>
                 {person.biography
                   ? <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{person.biography}</p>
-                  : <p className="text-slate-600 text-sm">Натисніть щоб додати біографію...</p>}
+                  : <p className="text-slate-600 text-sm">{canEdit ? 'Натисніть щоб додати біографію...' : 'Біографія відсутня'}</p>}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Модалка редагування поля */}
+      {/* Field edit modal */}
       {editField && editField !== 'biography' && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={e => e.target === e.currentTarget && setEditField(null)}>
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60"
+          onClick={e => e.target === e.currentTarget && setEditField(null)}>
           <div className="w-full bg-slate-900 rounded-t-3xl p-5 border-t border-slate-700"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
             <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-5" />
-            <p className="text-slate-400 text-sm mb-2">Редагування</p>
+            <p className="text-slate-400 text-sm mb-2">
+              {isEditor ? 'Запропонувати зміну' : 'Редагування'}
+            </p>
             <input value={editValue} onChange={e => setEditValue(e.target.value)}
               type={editField.includes('date') ? 'date' : 'text'} autoFocus
-              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-blue-500 text-base mb-4" />
+              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-blue-500 text-base mb-3" />
+            {proposeSuccess && (
+              <p className="text-green-400 text-sm text-center mb-3">✅ Пропозицію надіслано адміністратору!</p>
+            )}
             <div className="flex gap-2">
-              <button onClick={() => setEditField(null)} className="flex-1 bg-slate-800 text-slate-300 py-3.5 rounded-2xl font-semibold">Скасувати</button>
-              <button onClick={saveField} disabled={saving} className="flex-1 bg-blue-600 text-white py-3.5 rounded-2xl font-semibold">
-                {saving ? '...' : 'Зберегти'}
+              <button onClick={() => setEditField(null)}
+                className="flex-1 bg-slate-800 text-slate-300 py-3.5 rounded-2xl font-semibold">
+                Скасувати
+              </button>
+              <button onClick={saveField} disabled={saving}
+                className={`flex-1 py-3.5 rounded-2xl font-semibold ${isEditor ? 'bg-yellow-600 text-white' : 'bg-blue-600 text-white'}`}>
+                {saveLabel}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Модалка зв'язку */}
+      {/* Relationship modal */}
       {showRelModal && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60" onClick={e => e.target === e.currentTarget && setShowRelModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60"
+          onClick={e => e.target === e.currentTarget && setShowRelModal(false)}>
           <div className="w-full bg-slate-900 rounded-t-3xl p-5 border-t border-slate-700 max-h-[80vh] overflow-y-auto"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
             <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-5" />
