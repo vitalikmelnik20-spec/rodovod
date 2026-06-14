@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTelegramApp } from '../hooks/useTelegramApp';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
+
+const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'csacas_bot';
 
 export default function LoginPage() {
   const { ready, initData } = useTelegramApp();
@@ -11,23 +13,60 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const widgetRef = useRef(null);
 
+  // Якщо вже залогінений
   useEffect(() => {
-    if (user) { navigate('/', { replace: true }); return; }
-    if (!ready) return;
-    if (initData) handleTelegramAuth();
-  }, [ready, initData, user]);
+    if (user) navigate('/', { replace: true });
+  }, [user]);
 
-  async function handleTelegramAuth() {
+  // Telegram Mini App — автологін
+  useEffect(() => {
+    if (!ready || user) return;
+    if (initData) handleMiniAppAuth();
+    else mountWidget();
+  }, [ready]);
+
+  async function handleMiniAppAuth() {
     setLoading(true);
     try {
       const res = await api.post('/auth/telegram', { init_data: initData });
       login(res.data.user, res.data.access, res.data.refresh);
       navigate('/', { replace: true });
     } catch {
-      setError('Помилка авторизації');
+      setError('Помилка авторизації через Telegram');
       setLoading(false);
     }
+  }
+
+  function mountWidget() {
+    if (!widgetRef.current) return;
+    // Глобальний callback для Telegram Widget
+    window.onTelegramWidgetAuth = async (data) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.post('/auth/telegram/widget', data);
+        login(res.data.user, res.data.access, res.data.refresh);
+        navigate('/', { replace: true });
+      } catch {
+        setError('Помилка авторизації. Спробуйте ще раз.');
+        setLoading(false);
+      }
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.setAttribute('data-telegram-login', BOT_USERNAME);
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-userpic', 'true');
+    script.setAttribute('data-radius', '12');
+    script.setAttribute('data-onauth', 'onTelegramWidgetAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    script.async = true;
+
+    widgetRef.current.innerHTML = '';
+    widgetRef.current.appendChild(script);
   }
 
   if (loading || (ready && initData && !error)) {
@@ -40,31 +79,43 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 p-6">
-      <div className="text-8xl mb-6">🌳</div>
-      <h1 className="text-3xl font-bold text-white mb-2">Родовідне Дерево</h1>
-      <p className="text-slate-400 text-center mb-10">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 px-6">
+      {/* Logo */}
+      <div className="text-8xl mb-4">🌳</div>
+      <h1 className="text-3xl font-bold text-white mb-2 text-center">Родовідне Дерево</h1>
+      <p className="text-slate-400 text-center text-sm mb-10 max-w-xs">
         Спільна платформа для збереження генеалогічного дерева вашої родини
       </p>
+
+      {/* Error */}
       {error && (
-        <div className="bg-red-900/40 border border-red-500 text-red-300 px-4 py-3 rounded-xl mb-6 text-sm">
+        <div className="bg-red-900/40 border border-red-500/50 text-red-300 px-4 py-3 rounded-2xl mb-6 text-sm text-center w-full max-w-xs">
           {error}
         </div>
       )}
-      <div className="flex flex-col items-center gap-4">
-        <p className="text-slate-500 text-sm text-center">
-          Додаток працює тільки через Telegram Mini App
-        </p>
+
+      {/* Telegram Login Widget */}
+      <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+        <div ref={widgetRef} className="flex justify-center w-full" />
+
+        <div className="flex items-center gap-3 w-full">
+          <div className="flex-1 h-px bg-slate-700" />
+          <span className="text-slate-600 text-xs">або</span>
+          <div className="flex-1 h-px bg-slate-700" />
+        </div>
+
+        {/* Кнопка відкрити в Telegram (якщо виджет не працює) */}
         <a
-          href={`https://t.me/${import.meta.env.VITE_BOT_USERNAME || 'csacas_bot'}`}
+          href={`https://t.me/${BOT_USERNAME}`}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-3 bg-blue-500 hover:bg-blue-400 active:scale-95 transition-all text-white font-bold px-8 py-4 rounded-2xl text-lg shadow-lg shadow-blue-900/40"
+          className="flex items-center justify-center gap-3 w-full bg-blue-500/20 border border-blue-500/40 hover:bg-blue-500/30 active:scale-95 transition-all text-blue-300 font-semibold px-6 py-3.5 rounded-2xl text-sm"
         >
-          <span className="text-2xl">✈️</span> Відкрити в Telegram
+          <span className="text-xl">✈️</span> Відкрити бота в Telegram
         </a>
+
         <p className="text-slate-600 text-xs text-center">
-          Натисніть кнопку «Відкрити додаток» всередині бота
+          У боті натисніть «Відкрити додаток» — він відкриється як Mini App
         </p>
       </div>
     </div>
