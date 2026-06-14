@@ -51,9 +51,22 @@ export default function LoginPage() {
           {error}
         </div>
       )}
-      <p className="text-slate-500 text-sm text-center">
-        Відкрийте додаток через Telegram-бота
-      </p>
+      <div className="flex flex-col items-center gap-4">
+        <p className="text-slate-500 text-sm text-center">
+          Додаток працює тільки через Telegram Mini App
+        </p>
+        <a
+          href={`https://t.me/${import.meta.env.VITE_BOT_USERNAME || 'RodovodBot'}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-3 bg-blue-500 hover:bg-blue-400 active:scale-95 transition-all text-white font-bold px-8 py-4 rounded-2xl text-lg shadow-lg shadow-blue-900/40"
+        >
+          <span className="text-2xl">✈️</span> Відкрити в Telegram
+        </a>
+        <p className="text-slate-600 text-xs text-center">
+          Натисніть кнопку «Відкрити додаток» всередині бота
+        </p>
+      </div>
     </div>
   );
 }
