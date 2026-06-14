@@ -3,32 +3,46 @@
 @tailwind utilities;
 
 :root {
-  --bg-dark: #0F172A;
-  --card-dark: #1E293B;
-  --accent-dark: #3B82F6;
-  --bg-light: #F8FAFC;
-  --card-light: #FFFFFF;
-  --accent-light: #1E40AF;
-  --edge-blood: #3B82F6;
-  --edge-spouse: #EF4444;
-  --edge-adoption: #22C55E;
-  --edge-other: #9CA3AF;
+  --tg-color-scheme: dark;
+  color-scheme: dark;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg-dark);
+html, body, #root {
+  height: 100%;
+  background: #0F172A;
   color: #F1F5F9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overscroll-behavior: none;
 }
 
-body.light {
-  background: var(--bg-light);
-  color: #0F172A;
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+/* React Flow */
+.react-flow__node { cursor: pointer; }
+.react-flow__controls { background: #1E293B !important; border: 1px solid #334155 !important; border-radius: 12px !important; overflow: hidden; }
+.react-flow__controls-button { background: transparent !important; border: none !important; border-bottom: 1px solid #334155 !important; color: #94A3B8 !important; }
+.react-flow__controls-button:last-child { border-bottom: none !important; }
+.react-flow__controls-button:hover { background: #334155 !important; }
+.react-flow__controls-button svg { fill: #94A3B8; }
+.react-flow__minimap { border-radius: 12px !important; overflow: hidden; }
+
+/* Person node анімація */
+.person-node:active { transform: scale(0.93) !important; transition: transform 0.1s; }
+
+/* Bottom sheet анімація */
+.bottom-sheet-enter { animation: slideUp 0.25s ease-out; }
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
-.react-flow__node {
-  border-radius: 12px;
-  cursor: pointer;
-}
+/* Активні елементи */
+button:active { transform: scale(0.97); }
+
+/* Safe area */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
+import { useTelegramApp } from './hooks/useTelegramApp';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import TreePage from './pages/TreePage';
@@ -19,6 +21,14 @@ function PrivateRoute({ children }) {
 }
 
 export default function App() {
+  const { tg } = useTelegramApp();
+
+  useEffect(() => {
+    if (tg) {
+      tg.MainButton.hide();
+    }
+  }, [tg]);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

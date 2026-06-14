@@ -296,7 +296,7 @@ bot.callbackQuery(/^person:([^:]+):([^:]+)$/, async (ctx) => {
   try {
     const p = await api.getPerson(treeId, personId, token);
     await ctx.reply(formatPerson(p) + (p.biography ? `\n\n📝 ${p.biography.slice(0, 300)}` : ''),
-      { parse_mode: 'Markdown', reply_markup: personMenu(treeId, personId) });
+      { parse_mode: 'Markdown', reply_markup: personMenu(treeId, personId, FRONTEND) });
   } catch {
     await ctx.reply('❌ Особу не знайдено');
   }
@@ -611,4 +611,20 @@ async function handleAddPersonFSM(ctx, userId, state, data, text, token) {
 // ─── Запуск ──────────────────────────────────────────────────────────────────
 
 bot.catch(err => console.error('Bot error:', err.message));
-bot.start({ onStart: (info) => console.log(`Bot @${info.username} started`) });
+
+bot.start({
+  onStart: async (info) => {
+    console.log(`Bot @${info.username} started`);
+    // Встановити кнопку меню — відкриває Mini App
+    if (FRONTEND && !FRONTEND.includes('localhost')) {
+      try {
+        await bot.api.setChatMenuButton({
+          menu_button: { type: 'web_app', text: '🌳 Родовід', web_app: { url: FRONTEND } },
+        });
+        console.log('Menu button set');
+      } catch (e) {
+        console.log('Menu button skipped:', e.message);
+      }
+    }
+  },
+});
