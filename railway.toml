@@ -1,9 +1,9 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd backend && npm install && cd ../frontend && npm install && npm run build && cd ../backend && npm run migrate"
+buildCommand = "cd backend && npm install && cd ../frontend && npm install && npm run build"
 
 [deploy]
-startCommand = "cd backend && node src/index.js"
+startCommand = "cd backend && node src/migrations/run.js && node src/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
