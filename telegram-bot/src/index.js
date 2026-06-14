@@ -608,23 +608,47 @@ async function handleAddPersonFSM(ctx, userId, state, data, text, token) {
   );
 }
 
-// ─── Запуск ──────────────────────────────────────────────────────────────────
+// ─── Запуск (polling або webhook) ────────────────────────────────────────────
 
 bot.catch(err => console.error('Bot error:', err.message));
 
-bot.start({
-  onStart: async (info) => {
-    console.log(`Bot @${info.username} started`);
-    // Встановити кнопку меню — відкриває Mini App
-    if (FRONTEND && !FRONTEND.includes('localhost')) {
-      try {
-        await bot.api.setChatMenuButton({
-          menu_button: { type: 'web_app', text: '🌳 Родовід', web_app: { url: FRONTEND } },
-        });
-        console.log('Menu button set');
-      } catch (e) {
-        console.log('Menu button skipped:', e.message);
-      }
+async function setMenuButton(username) {
+  if (FRONTEND && !FRONTEND.includes('localhost')) {
+    try {
+      await bot.api.setChatMenuButton({
+        menu_button: { type: 'web_app', text: '🌳 Родовід', web_app: { url: FRONTEND } },
+      });
+      console.log('Menu button set →', FRONTEND);
+    } catch (e) {
+      console.log('Menu button skipped:', e.message);
     }
-  },
-});
+  }
+}
+
+const WEBHOOK_URL = process.env.WEBHOOK_URL; // https://your-backend.railway.app/bot
+
+if (WEBHOOK_URL) {
+  // Продакшн: webhook через Express (backend сам приймає запити)
+  const express = require('express');
+  const { webhookCallback } = require('grammy');
+  const app = express();
+  app.use(express.json());
+  app.use('/bot', webhookCallback(bot, 'express'));
+  app.get('/health', (req, res) => res.json({ ok: true }));
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, async () => {
+    console.log(`Bot webhook server on port ${PORT}`);
+    await bot.api.setWebhook(WEBHOOK_URL);
+    console.log('Webhook set:', WEBHOOK_URL);
+    const info = await bot.api.getMe();
+    await setMenuButton(info.username);
+  });
+} else {
+  // Локальна розробка: long polling
+  bot.start({
+    onStart: async (info) => {
+      console.log(`Bot @${info.username} started (polling)`);
+      await setMenuButton(info.username);
+    },
+  });
+}
