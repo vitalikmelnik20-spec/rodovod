@@ -1,0 +1,9 @@
+{
+  "name": "rodovod",
+  "version": "1.0.0",
+  "description": "Родовід — Родовідне дерево",
+  "scripts": {
+    "start": "cd backend && node src/index.js",
+    "build": "cd backend && npm install && npm run build && npm run migrate"
+  }
+}
