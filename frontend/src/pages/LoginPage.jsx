@@ -15,16 +15,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const widgetRef = useRef(null);
 
-  // Якщо вже залогінений
+  // Telegram Mini App — автологін (завжди, щоб оновити токени)
   useEffect(() => {
-    if (user) navigate('/', { replace: true });
-  }, [user]);
-
-  // Telegram Mini App — автологін
-  useEffect(() => {
-    if (!ready || user) return;
-    if (initData) handleMiniAppAuth();
-    else mountWidget();
+    if (!ready) return;
+    if (initData) {
+      handleMiniAppAuth();
+    } else if (user) {
+      navigate('/', { replace: true });
+    } else {
+      mountWidget();
+    }
   }, [ready]);
 
   async function handleMiniAppAuth() {

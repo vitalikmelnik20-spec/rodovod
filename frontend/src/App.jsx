@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { useTelegramApp } from './hooks/useTelegramApp';
@@ -18,6 +18,15 @@ import Layout from './components/layout/Layout';
 
 function PrivateRoute({ children }) {
   const user = useAuthStore(s => s.user);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    return unsub;
+  }, []);
+
+  if (!hydrated) return <div className="min-h-screen bg-slate-900" />;
   return user ? children : <Navigate to="/login" replace />;
 }
 
