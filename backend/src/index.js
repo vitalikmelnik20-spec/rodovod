@@ -89,5 +89,6 @@ httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`[ENV] BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? process.env.TELEGRAM_BOT_TOKEN.slice(0, 12) + '...' : 'NOT SET ❌'}`);
   console.log(`[ENV] JWT_SECRET: ${process.env.JWT_SECRET ? 'SET ✓' : 'NOT SET ❌'}`);
+  console.log(`[ENV] JWT_REFRESH_SECRET: ${process.env.JWT_REFRESH_SECRET ? 'SET ✓' : 'NOT SET ❌'}`);
   console.log(`[ENV] DATABASE_URL: ${process.env.DATABASE_URL ? 'SET ✓' : 'NOT SET ❌'}`);
 });
