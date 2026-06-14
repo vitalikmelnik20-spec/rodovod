@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build && npm run migrate"
+buildCommand = "npm install && cd ../frontend && npm install && npm run build && cd ../backend && npm run migrate"
 
 [deploy]
 startCommand = "node src/index.js"
