@@ -1,9 +1,9 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd backend && npm install && cd ../frontend && npm install --include=dev && npm run build"
+buildCommand = "cd backend && npm install && cd ../frontend && npm install --include=dev && npm run build && cd ../telegram-bot && npm install --production"
 
 [deploy]
-startCommand = "cd backend && node src/migrations/run.js; node src/index.js"
+startCommand = "cd backend && node src/migrations/run.js; cd ../telegram-bot && node src/index.js & cd ../backend && node src/index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
@@ -14,3 +14,4 @@ NODE_ENV = "production"
 VITE_BOT_USERNAME = "csacas_bot"
 JWT_SECRET = "rodovod_jwt_secret_2026_x9k2m"
 JWT_REFRESH_SECRET = "rodovod_refresh_secret_2026_z7p1q"
+FRONTEND_URL = "https://rodovod-production.up.railway.app"

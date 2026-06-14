@@ -6,7 +6,7 @@ const { mainMenu, treeMenu, personMenu, relationTypeMenu, confirmMenu, skipButto
 const { formatPerson, formatDate, parseDate, relTypeLabel } = require('./utils');
 
 const bot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
-const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND = process.env.FRONTEND_URL || 'https://rodovod-production.up.railway.app';
 
 // ─── Авторизація ─────────────────────────────────────────────────────────────
 
