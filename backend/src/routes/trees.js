@@ -58,7 +58,9 @@ router.post('/', requireAuth, async (req, res) => {
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.*, tm.role FROM trees t
+      `SELECT t.*, tm.role,
+        (SELECT COUNT(*) FROM change_proposals WHERE tree_id = t.id AND status = 'pending') AS pending_proposals
+       FROM trees t
        JOIN tree_members tm ON tm.tree_id = t.id
        WHERE t.id = $1 AND tm.telegram_user_id = $2 AND tm.status = 'active'`,
       [req.params.id, req.user.telegram_id]

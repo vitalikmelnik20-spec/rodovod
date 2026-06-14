@@ -55,7 +55,7 @@ export default function TreePage() {
   const [relationships, setRelationships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ first_name: '', last_name: '' });
+  const [addForm, setAddForm] = useState({ first_name: '', last_name: '', gender: '' });
   const [adding, setAdding] = useState(false);
   const socketRef = useRef(null);
 
@@ -96,7 +96,7 @@ export default function TreePage() {
     try {
       const res = await api.post(`/trees/${id}/persons`, addForm);
       setPersons(prev => [...prev, res.data]);
-      setAddForm({ first_name: '', last_name: '' });
+      setAddForm({ first_name: '', last_name: '', gender: '' });
       setShowAddModal(false);
     } catch { }
     setAdding(false);
@@ -160,6 +160,19 @@ export default function TreePage() {
               <input value={addForm.first_name} onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))}
                 placeholder="Ім'я"
                 className="bg-slate-800 text-white rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 text-base" />
+              <div className="flex gap-2">
+                {[{ v: 'male', label: '♂ Чоловік' }, { v: 'female', label: '♀ Жінка' }, { v: '', label: '— Не вказано' }].map(opt => (
+                  <button key={opt.v} type="button"
+                    onClick={() => setAddForm(f => ({ ...f, gender: opt.v }))}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      addForm.gender === opt.v
+                        ? opt.v === 'male' ? 'bg-blue-600 text-white' : opt.v === 'female' ? 'bg-pink-600 text-white' : 'bg-slate-600 text-white'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setShowAddModal(false)}

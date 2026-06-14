@@ -13,13 +13,16 @@ export default function PersonNode({ data }) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} style={{ background: '#3B82F6', width: 8, height: 8 }} />
+      <Handle type="target" position={Position.Top} style={{
+        background: !data.is_alive ? '#475569' : data.gender === 'male' ? '#3B82F6' : data.gender === 'female' ? '#EC4899' : '#0EA5E9',
+        width: 8, height: 8,
+      }} />
 
       <div onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
         className="person-node bg-slate-800 border-2 rounded-2xl overflow-hidden cursor-pointer active:scale-95 transition-all select-none"
         style={{
           width: 110,
-          borderColor: data.is_alive ? '#3B82F6' : '#475569',
+          borderColor: !data.is_alive ? '#475569' : data.gender === 'male' ? '#3B82F6' : data.gender === 'female' ? '#EC4899' : '#0EA5E9',
           boxShadow: data.highlighted ? '0 0 0 3px #3B82F6' : '0 4px 20px rgba(0,0,0,0.5)',
         }}>
 
@@ -29,7 +32,14 @@ export default function PersonNode({ data }) {
             <img src={data.avatar_url} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center"
-              style={{ background: data.is_alive ? 'linear-gradient(135deg, #1e3a8a, #1d4ed8)' : 'linear-gradient(135deg, #1e293b, #334155)' }}>
+              style={{ background: !data.is_alive
+                ? 'linear-gradient(135deg, #1e293b, #334155)'
+                : data.gender === 'male'
+                  ? 'linear-gradient(135deg, #1e3a8a, #1d4ed8)'
+                  : data.gender === 'female'
+                    ? 'linear-gradient(135deg, #831843, #be185d)'
+                    : 'linear-gradient(135deg, #164e63, #0e7490)'
+              }}>
               <span className="text-white text-2xl font-bold">{initials}</span>
             </div>
           )}
@@ -53,7 +63,10 @@ export default function PersonNode({ data }) {
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} style={{ background: '#3B82F6', width: 8, height: 8 }} />
+      <Handle type="source" position={Position.Bottom} style={{
+        background: !data.is_alive ? '#475569' : data.gender === 'male' ? '#3B82F6' : data.gender === 'female' ? '#EC4899' : '#0EA5E9',
+        width: 8, height: 8,
+      }} />
     </>
   );
 }
