@@ -27,6 +27,7 @@ export default function PersonPage() {
   const [allPersons, setAllPersons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('info');
+  const [photoView, setPhotoView] = useState(null);
 
   // Edit/propose
   const [editField, setEditField] = useState(null);
@@ -77,7 +78,10 @@ export default function PersonPage() {
       setRelated(
         personsRes.data
           .filter(p => relatedIds.includes(p.id))
-          .map(p => ({ ...p, relType: myRels.find(r => r.person_a_id === p.id || r.person_b_id === p.id)?.relation_type }))
+          .map(p => {
+            const rel = myRels.find(r => r.person_a_id === p.id || r.person_b_id === p.id);
+            return { ...p, relType: rel?.relation_type, relId: rel?.id };
+          })
       );
     } catch { }
     setLoading(false);
@@ -160,6 +164,28 @@ export default function PersonPage() {
       setPerson(prev => ({ ...prev, avatar_url: url }));
       setMedia(prev => prev.map(m => ({ ...m, is_avatar: m.id === mediaId })));
     } catch { }
+  }
+
+  async function deleteRelationship(relId) {
+    if (!window.confirm("Видалити зв'язок?")) return;
+    try {
+      await api.delete(`/trees/${treeId}/relationships/${relId}`);
+      setRelated(prev => prev.filter(p => p.relId !== relId));
+    } catch {}
+  }
+
+  async function saveGender(gender) {
+    try {
+      const res = await api.put(`/trees/${treeId}/persons/${pid}`, { gender: gender || null });
+      setPerson(res.data);
+    } catch {}
+  }
+
+  async function toggleAlive() {
+    try {
+      const res = await api.put(`/trees/${treeId}/persons/${pid}`, { is_alive: !person.is_alive });
+      setPerson(res.data);
+    } catch {}
   }
 
   async function addMemory() {
@@ -287,6 +313,41 @@ export default function PersonPage() {
                 {canEdit && <span className="text-slate-600 ml-2">{isEditor ? '📨' : '✏️'}</span>}
               </div>
             ))}
+
+
+            {/* Gender selector */}
+            <div className="bg-slate-800 rounded-2xl px-4 py-3">
+              <p className="text-slate-400 text-xs mb-2">Стать</p>
+              <div className="flex gap-2">
+                {[{ v: 'male', label: '♂ Чоловік' }, { v: 'female', label: '♀ Жінка' }, { v: '', label: '— Не вказано' }].map(opt => (
+                  <button key={opt.v} type="button"
+                    onClick={() => role === 'admin' && saveGender(opt.v || null)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
+                      (person.gender || '') === opt.v
+                        ? opt.v === 'male' ? 'bg-blue-600 text-white' : opt.v === 'female' ? 'bg-pink-600 text-white' : 'bg-slate-600 text-white'
+                        : 'bg-slate-700 text-slate-400'
+                    } ${role !== 'admin' ? 'cursor-default' : 'active:scale-95'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* is_alive toggle — admin only */}
+            {role === 'admin' && (
+              <button onClick={toggleAlive}
+                className="w-full bg-slate-800 rounded-2xl px-4 py-3 flex items-center justify-between active:scale-[0.98] transition-all">
+                <div className="text-left">
+                  <p className="text-white text-sm font-medium">Статус</p>
+                  <p className={`text-xs mt-0.5 ${person.is_alive ? 'text-green-400' : 'text-slate-400'}`}>
+                    {person.is_alive ? '🟢 Живий/а' : '⚫ Помер/ла — натисніть щоб змінити'}
+                  </p>
+                </div>
+                <span className={`text-xs px-3 py-1.5 rounded-xl font-semibold ${person.is_alive ? 'bg-slate-700 text-slate-300' : 'bg-green-800 text-green-300'}`}>
+                  {person.is_alive ? 'Позначити ✝' : 'Живий/а'}
+                </span>
+              </button>
+            )}
           </div>
         )}
 
@@ -304,18 +365,28 @@ export default function PersonPage() {
             ) : related.map(p => {
               const n = [p.last_name, p.first_name].filter(Boolean).join(' ') || 'Без імені';
               return (
-                <div key={p.id} onClick={() => navigate(`/tree/${treeId}/person/${p.id}`)}
-                  className="flex items-center gap-3 bg-slate-800 rounded-2xl p-3 mb-2 active:scale-95 transition-all cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-blue-700 flex items-center justify-center text-white font-bold flex-shrink-0">
-                    {[p.first_name, p.last_name].filter(Boolean).map(s => s[0]).join('') || '?'}
+                <div key={p.id} className="flex items-center gap-2 mb-2">
+                  <div onClick={() => navigate(`/tree/${treeId}/person/${p.id}`)}
+                    className="flex items-center gap-3 bg-slate-800 rounded-2xl p-3 active:scale-95 transition-all cursor-pointer flex-1 min-w-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${
+                      p.gender === 'male' ? 'bg-blue-700' : p.gender === 'female' ? 'bg-pink-700' : 'bg-slate-600'
+                    }`}>
+                      {[p.first_name, p.last_name].filter(Boolean).map(s => s[0]).join('') || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">{n}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${REL_COLORS[p.relType] || 'bg-slate-700 text-slate-400'}`}>
+                        {REL_LABELS[p.relType] || p.relType}
+                      </span>
+                    </div>
+                    <span className="text-slate-600">›</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium truncate">{n}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${REL_COLORS[p.relType] || 'bg-slate-700 text-slate-400'}`}>
-                      {REL_LABELS[p.relType] || p.relType}
-                    </span>
-                  </div>
-                  <span className="text-slate-600">›</span>
+                  {role === 'admin' && (
+                    <button onClick={() => deleteRelationship(p.relId)}
+                      className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-slate-800 rounded-xl text-slate-500 hover:text-red-400 active:scale-90 transition-all">
+                      ✕
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -399,7 +470,8 @@ export default function PersonPage() {
                 {media.map(m => (
                   <div key={m.id} className="relative aspect-square rounded-xl overflow-hidden bg-slate-800">
                     {m.type === 'photo' ? (
-                      <img src={`${API_BASE}${m.url}`} alt="" className="w-full h-full object-cover" />
+                      <img src={`${API_BASE}${m.url}`} alt="" className="w-full h-full object-cover cursor-pointer active:scale-95 transition-all"
+                        onClick={() => setPhotoView(`${API_BASE}${m.url}`)} />
                     ) : (
                       <video src={`${API_BASE}${m.url}`} className="w-full h-full object-cover" />
                     )}
@@ -440,6 +512,18 @@ export default function PersonPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Photo lightbox */}
+      {photoView && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+          onClick={() => setPhotoView(null)}>
+          <img src={photoView} alt="" className="max-w-full max-h-full object-contain select-none" />
+          <button onClick={() => setPhotoView(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-black/60 rounded-full flex items-center justify-center text-white text-xl">
+            ✕
+          </button>
         </div>
       )}
 
