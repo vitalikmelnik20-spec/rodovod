@@ -3,7 +3,16 @@ const crypto = require('crypto');
 function verifyTelegramInitData(initData) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
-  if (!hash) return null;
+  if (!hash) {
+    console.error('[TG auth] initData has no hash field');
+    return null;
+  }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    console.error('[TG auth] TELEGRAM_BOT_TOKEN is not set!');
+    return null;
+  }
 
   params.delete('hash');
   const dataCheckString = [...params.entries()]
@@ -13,7 +22,7 @@ function verifyTelegramInitData(initData) {
 
   const secretKey = crypto
     .createHmac('sha256', 'WebAppData')
-    .update(process.env.TELEGRAM_BOT_TOKEN)
+    .update(botToken)
     .digest();
 
   const computedHash = crypto
@@ -21,7 +30,10 @@ function verifyTelegramInitData(initData) {
     .update(dataCheckString)
     .digest('hex');
 
-  if (computedHash !== hash) return null;
+  if (computedHash !== hash) {
+    console.error('[TG auth] Hash mismatch! Token prefix:', botToken.slice(0, 10) + '...');
+    return null;
+  }
 
   const user = JSON.parse(params.get('user') || 'null');
   return user;

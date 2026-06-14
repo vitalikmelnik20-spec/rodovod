@@ -52,7 +52,14 @@ app.use('/api/trees', proposalsRoutes);
 app.use('/api', proposalsRoutes);
 app.use('/api/trees', gedcomRoutes);
 
-app.get('/health', (req, res) => res.json({ status: 'ok', env: process.env.NODE_ENV }));
+app.get('/health', (req, res) => res.json({
+  status: 'ok',
+  env: process.env.NODE_ENV,
+  botConfigured: !!process.env.TELEGRAM_BOT_TOKEN,
+  botTokenPrefix: process.env.TELEGRAM_BOT_TOKEN ? process.env.TELEGRAM_BOT_TOKEN.slice(0, 10) + '...' : null,
+  dbConfigured: !!process.env.DATABASE_URL,
+  jwtConfigured: !!process.env.JWT_SECRET,
+}));
 
 // У продакшені — роздаємо frontend build
 if (isProd) {
