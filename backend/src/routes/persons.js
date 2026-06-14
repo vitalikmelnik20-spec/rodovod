@@ -54,7 +54,7 @@ router.get('/:id/persons/:pid', requireAuth, requireTreeRole(['admin', 'editor',
 // POST /api/trees/:id/persons
 router.post('/:id/persons', requireAuth, requireTreeRole(['admin', 'editor']), async (req, res) => {
   const { first_name, last_name, patronymic, birth_date, death_date,
-    birth_place, living_place, biography, is_alive = true, tags = [] } = req.body;
+    birth_place, living_place, biography, is_alive = true, tags = [], gender } = req.body;
 
   if (!first_name && !last_name) {
     return res.status(400).json({ error: 'first_name or last_name required' });
@@ -66,11 +66,11 @@ router.post('/:id/persons', requireAuth, requireTreeRole(['admin', 'editor']), a
     const personId = uuidv4();
     const { rows } = await client.query(
       `INSERT INTO persons (id, tree_id, first_name, last_name, patronymic, birth_date,
-        death_date, birth_place, living_place, biography, is_alive, tags, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        death_date, birth_place, living_place, biography, is_alive, tags, gender, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [personId, req.params.id, first_name, last_name, patronymic,
        birth_date || null, death_date || null, birth_place, living_place,
-       biography, is_alive, JSON.stringify(tags), req.user.telegram_id]
+       biography, is_alive, JSON.stringify(tags), gender || null, req.user.telegram_id]
     );
     await client.query(
       `INSERT INTO change_history (tree_id, entity_type, entity_id, action, changed_by, diff)
@@ -99,7 +99,7 @@ router.put('/:id/persons/:pid', requireAuth, requireTreeRole(['admin', 'editor']
     });
   }
   const { first_name, last_name, patronymic, birth_date, death_date,
-    birth_place, living_place, biography, is_alive, tags } = req.body;
+    birth_place, living_place, biography, is_alive, tags, gender } = req.body;
 
   const client = await getClient();
   try {
@@ -119,11 +119,12 @@ router.put('/:id/persons/:pid', requireAuth, requireTreeRole(['admin', 'editor']
          biography = COALESCE($8, biography),
          is_alive = COALESCE($9, is_alive),
          tags = COALESCE($10, tags),
+         gender = COALESCE($11, gender),
          updated_at = NOW()
-       WHERE id = $11 AND tree_id = $12 RETURNING *`,
+       WHERE id = $12 AND tree_id = $13 RETURNING *`,
       [first_name, last_name, patronymic, birth_date || null, death_date || null,
        birth_place, living_place, biography, is_alive,
-       tags ? JSON.stringify(tags) : null, req.params.pid, req.params.id]
+       tags ? JSON.stringify(tags) : null, gender || null, req.params.pid, req.params.id]
     );
     await client.query(
       `INSERT INTO change_history (tree_id, entity_type, entity_id, action, changed_by, diff)
