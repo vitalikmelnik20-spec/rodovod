@@ -27,6 +27,7 @@ const io = new Server(httpServer, {
   cors: { origin: '*', credentials: true },
 });
 
+app.set('trust proxy', 1); // Railway runs behind a reverse proxy
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '50mb' }));
