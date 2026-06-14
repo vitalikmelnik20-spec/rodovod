@@ -11,3 +11,4 @@ restartPolicyMaxRetries = 5
 
 [variables]
 NODE_ENV = "production"
+VITE_BOT_USERNAME = "csacas_bot"

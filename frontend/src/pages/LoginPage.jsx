@@ -56,7 +56,7 @@ export default function LoginPage() {
           Додаток працює тільки через Telegram Mini App
         </p>
         <a
-          href={`https://t.me/${import.meta.env.VITE_BOT_USERNAME || 'RodovodBot'}`}
+          href={`https://t.me/${import.meta.env.VITE_BOT_USERNAME || 'csacas_bot'}`}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-3 bg-blue-500 hover:bg-blue-400 active:scale-95 transition-all text-white font-bold px-8 py-4 rounded-2xl text-lg shadow-lg shadow-blue-900/40"
