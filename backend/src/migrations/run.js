@@ -38,4 +38,4 @@ async function run() {
   }
 }
 
-run().catch(err => { console.error(err); process.exit(1); });
+run().catch(err => { console.error('Migration error (server will still start):', err.message); process.exit(0); });
