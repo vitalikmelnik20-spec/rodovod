@@ -107,6 +107,46 @@ router.delete('/:id', requireAuth, requireTreeRole(['admin']), async (req, res) 
   }
 });
 
+// GET /api/trees/join/:token — public: resolve invite token to tree info
+router.get('/join/:token', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT il.tree_id, il.expires_at, t.name, t.description
+       FROM invite_links il JOIN trees t ON t.id = il.tree_id
+       WHERE il.token = $1 AND (il.expires_at IS NULL OR il.expires_at > NOW())`,
+      [req.params.token]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Invalid or expired invite' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/trees/join/:token — join tree by invite token (auth required)
+router.post('/join/:token', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM invite_links WHERE token = $1 AND (expires_at IS NULL OR expires_at > NOW())`,
+      [req.params.token]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Invalid or expired invite' });
+    const invite = rows[0];
+    await query(
+      `INSERT INTO tree_members (tree_id, telegram_user_id, role, status, invited_by)
+       VALUES ($1, $2, 'editor', 'active', $3)
+       ON CONFLICT (tree_id, telegram_user_id) DO NOTHING`,
+      [invite.tree_id, req.user.telegram_id, invite.created_by]
+    );
+    await query('UPDATE invite_links SET used_count = used_count + 1 WHERE id = $1', [invite.id]);
+    res.json({ ok: true, tree_id: invite.tree_id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/trees/:id/members
 router.get('/:id/members', requireAuth, requireTreeRole(['admin', 'editor', 'viewer']), async (req, res) => {
   try {
