@@ -4,14 +4,35 @@ import api from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-const REL_LABELS = {
-  parent_child: '👨‍👩‍👧 Батько/Мати', spouse: '💍 Чоловік/Дружина',
-  adoption: '👶 Усиновлення', other: '🔗 Інший',
-};
-const REL_COLORS = {
-  parent_child: 'bg-blue-900/40 text-blue-300', spouse: 'bg-red-900/40 text-red-300',
-  adoption: 'bg-green-900/40 text-green-300', other: 'bg-slate-700 text-slate-400',
-};
+const REL_MODAL_OPTIONS = [
+  { key: 'parent_child', label: '👨‍👩‍👧 Батько → Дитина' },
+  { key: 'spouse',       label: '💍 Чоловік/Дружина' },
+  { key: 'sibling',      label: '👫 Брат/Сестра' },
+  { key: 'adoption',     label: '👶 Усиновлення' },
+  { key: 'other',        label: '🔗 Інший' },
+];
+
+function getRelLabel(relType, gender, iAmA) {
+  if (relType === 'parent_child') {
+    if (iAmA) return gender === 'female' ? '👧 Дочка' : gender === 'male' ? '👦 Син' : '👶 Дитина';
+    return gender === 'female' ? '👩 Мати' : gender === 'male' ? '👨 Батько' : '👨‍👩‍👧 Батько/Мати';
+  }
+  if (relType === 'spouse') return gender === 'female' ? '💍 Дружина' : gender === 'male' ? '💍 Чоловік' : '💍 Чоловік/Дружина';
+  if (relType === 'sibling') return gender === 'female' ? '👧 Сестра' : gender === 'male' ? '👦 Брат' : '👫 Брат/Сестра';
+  if (relType === 'adoption') {
+    if (iAmA) return gender === 'female' ? '👧 Усинов. дочка' : gender === 'male' ? '👦 Усинов. син' : '👶 Усинов. дитина';
+    return '🤝 Прийомні батьки';
+  }
+  return '🔗 Інший';
+}
+
+function getRelColor(relType, iAmA) {
+  if (relType === 'parent_child') return iAmA ? 'bg-sky-900/40 text-sky-300' : 'bg-indigo-900/40 text-indigo-300';
+  if (relType === 'spouse') return 'bg-red-900/40 text-red-300';
+  if (relType === 'sibling') return 'bg-purple-900/40 text-purple-300';
+  if (relType === 'adoption') return 'bg-green-900/40 text-green-300';
+  return 'bg-slate-700 text-slate-400';
+}
 
 function fmtDate(d) {
   if (!d) return null;
@@ -80,7 +101,8 @@ export default function PersonPage() {
           .filter(p => relatedIds.includes(p.id))
           .map(p => {
             const rel = myRels.find(r => r.person_a_id === p.id || r.person_b_id === p.id);
-            return { ...p, relType: rel?.relation_type, relId: rel?.id };
+            const iAmA = rel?.person_a_id === pid;
+            return { ...p, relType: rel?.relation_type, relId: rel?.id, iAmA };
           })
       );
     } catch { }
@@ -375,8 +397,8 @@ export default function PersonPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm font-medium truncate">{n}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${REL_COLORS[p.relType] || 'bg-slate-700 text-slate-400'}`}>
-                        {REL_LABELS[p.relType] || p.relType}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${getRelColor(p.relType, p.iAmA)}`}>
+                        {getRelLabel(p.relType, p.gender, p.iAmA)}
                       </span>
                     </div>
                     <span className="text-slate-600">›</span>
@@ -536,7 +558,7 @@ export default function PersonPage() {
             <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-5" />
             <h3 className="text-white font-bold text-lg mb-4">Тип зв'язку</h3>
             <div className="flex flex-wrap gap-2 mb-4">
-              {Object.entries(REL_LABELS).map(([key, label]) => (
+              {REL_MODAL_OPTIONS.map(({ key, label }) => (
                 <button key={key} onClick={() => setRelType(key)}
                   className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${relType === key ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
                   {label}

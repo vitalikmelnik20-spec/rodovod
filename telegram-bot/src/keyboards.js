@@ -31,8 +31,9 @@ const personMenu = (treeId, personId, frontendUrl) => {
 };
 
 const relationTypeMenu = (treeId, personAId) => new InlineKeyboard()
-  .text('👨‍👩‍👧 Батько/Мати → Дитина', `rel_type:parent_child:${treeId}:${personAId}`).row()
+  .text('👨‍👩‍👧 Батько → Дитина', `rel_type:parent_child:${treeId}:${personAId}`).row()
   .text('💍 Чоловік/Дружина', `rel_type:spouse:${treeId}:${personAId}`).row()
+  .text('👫 Брат/Сестра', `rel_type:sibling:${treeId}:${personAId}`).row()
   .text('👶 Усиновлення', `rel_type:adoption:${treeId}:${personAId}`).row()
   .text('🔗 Інший зв\'язок', `rel_type:other:${treeId}:${personAId}`);
 

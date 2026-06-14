@@ -11,22 +11,33 @@ export default function PersonNode({ data }) {
   const year = data.birth_date ? new Date(data.birth_date).getFullYear() : null;
   const deathYear = data.death_date ? new Date(data.death_date).getFullYear() : null;
 
+  const handleColor = !data.is_alive ? '#475569'
+    : data.gender === 'male' ? '#3B82F6'
+    : data.gender === 'female' ? '#EC4899'
+    : '#0EA5E9';
+
+  const handleStyle = { background: handleColor, width: 8, height: 8 };
+
   return (
     <>
-      <Handle type="target" position={Position.Top} style={{
-        background: !data.is_alive ? '#475569' : data.gender === 'male' ? '#3B82F6' : data.gender === 'female' ? '#EC4899' : '#0EA5E9',
-        width: 8, height: 8,
-      }} />
+      {/* Vertical handles (parent_child, spouse, adoption) */}
+      <Handle type="target" position={Position.Top} style={handleStyle} />
+
+      {/* Horizontal handles for sibling edges */}
+      <Handle type="source" id="left" position={Position.Left}
+        style={{ ...handleStyle, top: '50%' }} />
+      <Handle type="source" id="right" position={Position.Right}
+        style={{ ...handleStyle, top: '50%' }} />
 
       <div onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
         className="person-node bg-slate-800 border-2 rounded-2xl overflow-hidden cursor-pointer active:scale-95 transition-all select-none"
         style={{
           width: 110,
-          borderColor: !data.is_alive ? '#475569' : data.gender === 'male' ? '#3B82F6' : data.gender === 'female' ? '#EC4899' : '#0EA5E9',
+          borderColor: handleColor,
           boxShadow: data.highlighted ? '0 0 0 3px #3B82F6' : '0 4px 20px rgba(0,0,0,0.5)',
         }}>
 
-        {/* Фото або ініціали */}
+        {/* Photo or initials */}
         <div className="relative w-full" style={{ height: 80 }}>
           {data.avatar_url ? (
             <img src={data.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -43,11 +54,10 @@ export default function PersonNode({ data }) {
               <span className="text-white text-2xl font-bold">{initials}</span>
             </div>
           )}
-          {/* Статус */}
           <div className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border border-slate-800 ${data.is_alive ? 'bg-green-400' : 'bg-slate-500'}`} />
         </div>
 
-        {/* Ім'я і роки */}
+        {/* Name and years */}
         <div className="px-2 py-1.5 text-center">
           <p className="text-white text-xs font-bold leading-tight truncate">
             {data.first_name || data.last_name || 'Без імені'}
@@ -63,10 +73,7 @@ export default function PersonNode({ data }) {
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} style={{
-        background: !data.is_alive ? '#475569' : data.gender === 'male' ? '#3B82F6' : data.gender === 'female' ? '#EC4899' : '#0EA5E9',
-        width: 8, height: 8,
-      }} />
+      <Handle type="source" position={Position.Bottom} style={handleStyle} />
     </>
   );
 }
