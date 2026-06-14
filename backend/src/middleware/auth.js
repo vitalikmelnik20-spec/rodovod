@@ -18,7 +18,7 @@ async function requireAuth(req, res, next) {
   }
 }
 
-async function requireTreeRole(roles) {
+function requireTreeRole(roles) {
   return async (req, res, next) => {
     const treeId = req.params.id || req.params.treeId;
     const { rows } = await query(

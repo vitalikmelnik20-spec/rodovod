@@ -10,7 +10,4 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 
 [variables]
-DATABASE_URL = "${{Postgres.DATABASE_URL}}"
 NODE_ENV = "production"
-JWT_SECRET = "rodovod_jwt_secret_2026_x9k2m"
-TELEGRAM_BOT_TOKEN = "605670522:AAEuH5Ya08y6pRKWGgmEtRWW6vmgmPGEY20"
