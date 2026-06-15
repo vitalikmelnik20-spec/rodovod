@@ -37,6 +37,8 @@ function PersonNode({ data }) {
     </>
   );
 
+  const highlightRing = data.highlighted ? '0 0 0 3px #F59E0B, 0 0 12px #F59E0B80' : undefined;
+
   // 4.5 LOD — dot view at very low zoom
   if (zoom < 0.4) {
     return (
@@ -44,7 +46,10 @@ function PersonNode({ data }) {
         {handles}
         <div
           onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
-          style={{ width: 28, height: 28, borderRadius: '50%', background: bgGradient, border: `2px solid ${handleColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          style={{ width: 28, height: 28, borderRadius: '50%', background: bgGradient,
+            border: `2px solid ${data.highlighted ? '#F59E0B' : handleColor}`,
+            boxShadow: highlightRing,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
           <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>{initials}</span>
         </div>
@@ -60,7 +65,7 @@ function PersonNode({ data }) {
         <div
           onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
           className="person-node bg-slate-800 border-2 rounded-xl overflow-hidden cursor-pointer select-none"
-          style={{ width: 90, borderColor: handleColor }}
+          style={{ width: 90, borderColor: data.highlighted ? '#F59E0B' : handleColor, boxShadow: highlightRing }}
         >
           <div style={{ height: 55, background: bgGradient, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {data.avatar_url
@@ -85,7 +90,7 @@ function PersonNode({ data }) {
         style={{
           width: 110,
           borderColor: handleColor,
-          boxShadow: data.highlighted ? '0 0 0 3px #3B82F6' : '0 4px 20px rgba(0,0,0,0.5)',
+          boxShadow: data.highlighted ? '0 0 0 3px #F59E0B, 0 0 16px #F59E0B80' : '0 4px 20px rgba(0,0,0,0.5)',
         }}>
 
         <div className="relative w-full" style={{ height: 80 }}>
