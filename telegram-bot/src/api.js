@@ -16,6 +16,10 @@ async function request(method, path, data, token) {
 
 module.exports = {
   auth: (tgUser) => request('POST', '/auth/telegram/bot', tgUser),
+  generateLoginCode: (telegram_id) => request('POST', '/auth/generate-code', {
+    telegram_id,
+    bot_secret: process.env.BOT_SECRET,
+  }),
   getTrees: (token) => request('GET', '/trees', null, token),
   createTree: (name, token) => request('POST', '/trees', { name }, token),
   getTree: (id, token) => request('GET', `/trees/${id}`, null, token),

@@ -33,10 +33,11 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     await client.query('BEGIN');
     const treeId = uuidv4();
+    const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase();
     const { rows } = await client.query(
-      `INSERT INTO trees (id, name, description, is_public, created_by)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [treeId, name, description || null, is_public, req.user.telegram_id]
+      `INSERT INTO trees (id, name, description, is_public, created_by, invite_code)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [treeId, name, description || null, is_public, req.user.telegram_id, inviteCode]
     );
     await client.query(
       `INSERT INTO tree_members (tree_id, telegram_user_id, role, status)

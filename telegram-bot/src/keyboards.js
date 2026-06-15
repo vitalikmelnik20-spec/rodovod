@@ -8,7 +8,8 @@ const mainMenu = (frontendUrl) => {
   return new InlineKeyboard()
     .add(webApp('🌳 Відкрити додаток', url)).row()
     .text('📋 Мої дерева', 'my_trees').row()
-    .text('➕ Створити дерево', 'create_tree');
+    .text('➕ Створити дерево', 'create_tree').row()
+    .text('🔑 Код для входу на сайт', 'get_login_code');
 };
 
 const treeMenu = (treeId, frontendUrl) => {

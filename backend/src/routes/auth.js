@@ -118,6 +118,51 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// POST /api/auth/generate-code — called by bot to create a one-time login code
+router.post('/generate-code', async (req, res) => {
+  try {
+    const { telegram_id, bot_secret } = req.body;
+    if (bot_secret !== process.env.BOT_SECRET || !telegram_id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    await query('DELETE FROM login_codes WHERE telegram_id = $1', [telegram_id]);
+    await query(
+      `INSERT INTO login_codes (code, telegram_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '5 minutes')`,
+      [code, telegram_id]
+    );
+    res.json({ code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/auth/login-code — website uses code to get JWT tokens
+router.post('/login-code', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'code required' });
+
+    const { rows } = await query(
+      `SELECT * FROM login_codes WHERE code = $1 AND used = FALSE AND expires_at > NOW()`,
+      [code.toUpperCase().trim()]
+    );
+    if (!rows.length) return res.status(401).json({ error: 'Невірний або прострочений код' });
+
+    await query('UPDATE login_codes SET used = TRUE WHERE code = $1', [code.toUpperCase().trim()]);
+
+    const { rows: users } = await query('SELECT * FROM users WHERE telegram_id = $1', [rows[0].telegram_id]);
+    if (!users.length) return res.status(404).json({ error: 'Користувача не знайдено' });
+
+    const tokens = generateTokens(users[0].telegram_id);
+    res.json({ user: users[0], ...tokens });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/auth/logout
 router.post('/logout', (req, res) => res.json({ ok: true }));
 

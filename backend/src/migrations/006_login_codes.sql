@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS login_codes (
+  code VARCHAR(8) PRIMARY KEY,
+  telegram_id BIGINT NOT NULL,
+  expires_at TIMESTAMP NOT NULL DEFAULT NOW() + INTERVAL '5 minutes',
+  used BOOLEAN NOT NULL DEFAULT FALSE
+);

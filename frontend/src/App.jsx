@@ -14,6 +14,7 @@ import SettingsPage from './pages/SettingsPage';
 import MembersPage from './pages/MembersPage';
 import ProposalsPage from './pages/ProposalsPage';
 import JoinPage from './pages/JoinPage';
+import InvitePage from './pages/InvitePage';
 import Layout from './components/layout/Layout';
 
 function PrivateRoute({ children }) {
@@ -43,6 +44,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/join/:token" element={<JoinPage />} />
+      <Route path="/invite/:code" element={<InvitePage />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<HomePage />} />
         <Route path="tree/:id" element={<TreePage />} />

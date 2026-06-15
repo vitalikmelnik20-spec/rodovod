@@ -76,6 +76,24 @@ bot.command('web', async (ctx) => {
   await ctx.reply(`🌐 Відкрийте веб-версію:\n${url}`);
 });
 
+// ─── /code — отримати код для входу на сайт ──────────────────────────────────
+
+bot.command('code', async (ctx) => {
+  if (!await ensureAuth(ctx)) return;
+  try {
+    const { code } = await api.generateLoginCode(ctx.from.id);
+    await ctx.reply(
+      `🔑 *Ваш код для входу на сайт:*\n\n\`${code}\`\n\n` +
+      `Введіть його на сайті → Увійти за кодом\n` +
+      `⏱ Код дійсний 5 хвилин і лише для одного входу.\n\n` +
+      `🌐 ${FRONTEND}`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch {
+    await ctx.reply('❌ Помилка генерації коду. Спробуйте ще раз.');
+  }
+});
+
 // ─── /trees ──────────────────────────────────────────────────────────────────
 
 bot.command('trees', async (ctx) => {
@@ -258,6 +276,23 @@ bot.callbackQuery('create_tree', async (ctx) => {
   if (!await ensureAuth(ctx)) return;
   fsm.setState(ctx.from.id, 'create_tree', {});
   await ctx.reply('🌳 Введіть *назву* нового дерева:', { parse_mode: 'Markdown', reply_markup: cancelButton });
+});
+
+bot.callbackQuery('get_login_code', async (ctx) => {
+  await ctx.answerCallbackQuery();
+  if (!await ensureAuth(ctx)) return;
+  try {
+    const { code } = await api.generateLoginCode(ctx.from.id);
+    await ctx.reply(
+      `🔑 *Ваш код для входу на сайт:*\n\n\`${code}\`\n\n` +
+      `Введіть його на сайті → *Увійти за кодом*\n` +
+      `⏱ Код дійсний 5 хвилин і лише для одного входу.\n\n` +
+      `🌐 ${FRONTEND}`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch {
+    await ctx.reply('❌ Помилка генерації коду. Спробуйте ще раз.');
+  }
 });
 
 // ─── Callback: tree:ID ───────────────────────────────────────────────────────

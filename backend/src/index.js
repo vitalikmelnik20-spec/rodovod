@@ -18,6 +18,7 @@ const historyRoutes = require('./routes/history');
 const memoryRoutes = require('./routes/memory');
 const proposalsRoutes = require('./routes/proposals');
 const gedcomRoutes = require('./routes/gedcom');
+const inviteRoutes = require('./routes/invite');
 
 const app = express();
 const httpServer = createServer(app);
@@ -52,6 +53,7 @@ app.use('/api/trees', memoryRoutes);
 app.use('/api/trees', proposalsRoutes);
 app.use('/api', proposalsRoutes);
 app.use('/api/trees', gedcomRoutes);
+app.use('/api/invite', inviteRoutes);
 
 app.get('/health', (req, res) => res.json({
   status: 'ok',
