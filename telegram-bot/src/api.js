@@ -37,6 +37,8 @@ module.exports = {
   createRelationship: (treeId, data, token) => request('POST', `/trees/${treeId}/relationships`, data, token),
 
   getHistory: (treeId, token) => request('GET', `/trees/${treeId}/history`, null, token),
+  getInviteInfo: (token) => request('GET', `/trees/join/${token}`),
+  joinByToken: (token, authToken) => request('POST', `/trees/join/${token}`, {}, authToken),
 
   getProposals: (treeId, token) => request('GET', `/trees/${treeId}/proposals`, null, token),
   approveProposal: (propId, token) => request('PUT', `/proposals/${propId}/approve`, {}, token),

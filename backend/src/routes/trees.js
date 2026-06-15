@@ -171,14 +171,24 @@ router.get('/:id/members', requireAuth, requireTreeRole(['admin', 'editor', 'vie
 // POST /api/trees/:id/invite — генерувати посилання-запрошення
 router.post('/:id/invite', requireAuth, requireTreeRole(['admin']), async (req, res) => {
   try {
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(16).toString('hex');
     const { rows } = await query(
       `INSERT INTO invite_links (tree_id, token, created_by, expires_at)
        VALUES ($1, $2, $3, NOW() + INTERVAL '7 days') RETURNING *`,
       [req.params.id, token, req.user.telegram_id]
     );
-    const link = `${process.env.FRONTEND_URL}/join/${token}`;
-    res.json({ token, link, expires_at: rows[0].expires_at });
+    const baseUrl = process.env.FRONTEND_URL ||
+      (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:5173');
+    const botUsername = process.env.BOT_USERNAME || 'csacas_bot';
+    res.json({
+      token,
+      expires_at: rows[0].expires_at,
+      links: {
+        web:     `${baseUrl}/join/${token}`,
+        bot:     `https://t.me/${botUsername}?start=inv_${token}`,
+        webapp:  `https://t.me/${botUsername}/app?startapp=inv_${token}`,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

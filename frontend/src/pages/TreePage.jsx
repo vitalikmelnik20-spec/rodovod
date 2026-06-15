@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Background, Controls, MiniMap,
@@ -16,24 +16,39 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const nodeTypes = { personNode: PersonNode };
 
-function TreeFlow({ persons, relationships, onAddPerson }) {
+const TreeFlow = memo(function TreeFlow({ persons, relationships, onAddPerson }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
 
   useEffect(() => {
     const { nodes: n, edges: e } = buildGraphElements(persons, relationships);
-    setNodes(n);
+    // BUG-07: анімований перехід позицій існуючих вузлів
+    setNodes(n.map(node => ({
+      ...node,
+      style: { ...node.style, transition: 'all 0.35s ease' },
+    })));
     setEdges(e);
+    // BUG-04: центрувати після рендеру
     setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
-  }, [persons, relationships]);
+  }, [persons.length, relationships.length]);
 
   return (
     <ReactFlow
       nodes={nodes} edges={edges}
       onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
-      fitView minZoom={0.2} maxZoom={2}
+      fitView minZoom={0.1} maxZoom={2}
+      // BUG-03: правильна обробка touch-подій на мобільному
+      panOnScroll={false}
+      panOnDrag={true}
+      zoomOnPinch={true}
+      zoomOnScroll={false}
+      zoomOnDoubleClick={false}
+      preventScrolling={true}
+      // BUG-06: вимкнути непотрібні features
+      nodesDraggable={false}
+      nodesConnectable={false}
       proOptions={{ hideAttribution: true }}
       style={{ background: '#0F172A' }}>
       <Background color="#1e293b" gap={24} size={1} />
@@ -44,7 +59,7 @@ function TreeFlow({ persons, relationships, onAddPerson }) {
         maskColor="rgba(15,23,42,0.7)" />
     </ReactFlow>
   );
-}
+});
 
 export default function TreePage() {
   const { id } = useParams();

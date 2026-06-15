@@ -1,7 +1,8 @@
+import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { useNavigate, useParams } from 'react-router-dom';
 
-export default function PersonNode({ data }) {
+function PersonNode({ data }) {
   const navigate = useNavigate();
   const { id: treeId } = useParams();
 
@@ -77,3 +78,5 @@ export default function PersonNode({ data }) {
     </>
   );
 }
+
+export default memo(PersonNode);

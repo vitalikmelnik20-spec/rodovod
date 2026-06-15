@@ -32,14 +32,11 @@ bot.command('start', async (ctx) => {
   await ensureAuth(ctx);
   fsm.clearState(ctx.from.id);
 
-  // Перевірити чи є deep link (join токен)
+  // Перевірити чи є deep link (запрошення)
   const payload = ctx.match;
-  if (payload && payload.startsWith('join_')) {
-    const token = payload.replace('join_', '');
-    const tree = fsm.getCurrentTree(ctx.from.id);
-    // Перенаправляємо на join flow
-    ctx.match = token;
-    return handleJoin(ctx);
+  if (payload && (payload.startsWith('join_') || payload.startsWith('inv_'))) {
+    const token = payload.replace(/^(join_|inv_)/, '');
+    return handleJoinByToken(ctx, token);
   }
 
   await ctx.reply(
@@ -232,19 +229,24 @@ bot.command('invite', async (ctx) => {
   if (!await ensureAuth(ctx)) return;
   const tree = fsm.getCurrentTree(ctx.from.id);
   if (!tree.id) return ctx.reply('Спочатку оберіть дерево через /trees');
+  await sendInvite(ctx, tree.id, tree.name);
+});
 
+async function sendInvite(ctx, treeId, treeName) {
   const token = fsm.getToken(ctx.from.id);
   try {
-    const { link } = await api.invite(tree.id, token);
-    const botLink = `https://t.me/${ctx.me.username}?start=join_${link.split('/').pop()}`;
+    const { links, expires_at } = await api.invite(treeId, token);
+    const exp = new Date(expires_at).toLocaleDateString('uk-UA');
     await ctx.reply(
-      `🔗 *Запрошення до "${tree.name}"*\n\nПосилання (діє 7 днів):\n${link}\n\nАбо через бота:\n${botLink}`,
+      `🔗 *Запрошення до "${treeName}"*\n_(діє до ${exp})_\n\n` +
+      `📱 *Через бота Telegram:*\n${links.bot}\n\n` +
+      `🌐 *Веб-посилання:*\n${links.web}`,
       { parse_mode: 'Markdown' }
     );
   } catch {
     await ctx.reply('❌ Помилка генерації запрошення. Можливо, у вас недостатньо прав.');
   }
-});
+}
 
 // ─── /settings ───────────────────────────────────────────────────────────────
 
@@ -258,10 +260,36 @@ bot.command('settings', async (ctx) => {
 
 // ─── Callback: JOIN ──────────────────────────────────────────────────────────
 
-async function handleJoin(ctx) {
-  // Реалізується через веб-лінк
-  await ctx.reply(`🔗 Для приєднання перейдіть за посиланням:\n${FRONTEND}/join/${ctx.match}`);
+async function handleJoinByToken(ctx, token) {
+  try {
+    const info = await api.getInviteInfo(token);
+    const kb = new InlineKeyboard()
+      .text('✅ Приєднатись', `confirm_join:${token}`).row()
+      .text('❌ Відхилити', 'cancel');
+    await ctx.reply(
+      `🌳 Вас запрошують до дерева *"${info.name}"*\n\n` +
+      `Для приєднання натисніть кнопку нижче або перейдіть за посиланням:\n${FRONTEND}/join/${token}`,
+      { parse_mode: 'Markdown', reply_markup: kb }
+    );
+  } catch {
+    await ctx.reply(`🔗 Для приєднання перейдіть за посиланням:\n${FRONTEND}/join/${token}`);
+  }
 }
+
+bot.callbackQuery(/^confirm_join:(.+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  if (!await ensureAuth(ctx)) return;
+  const token = ctx.match[1];
+  const authToken = fsm.getToken(ctx.from.id);
+  try {
+    await api.joinByToken(token, authToken);
+    await ctx.reply('✅ Ви успішно приєднались до дерева!', {
+      reply_markup: new InlineKeyboard().add({ text: '🌳 Відкрити', web_app: { url: FRONTEND } }),
+    });
+  } catch {
+    await ctx.reply('❌ Не вдалось приєднатись. Можливо посилання прострочене.');
+  }
+});
 
 // ─── Callback: tree list ─────────────────────────────────────────────────────
 
@@ -395,13 +423,8 @@ bot.callbackQuery(/^invite:(.+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   if (!await ensureAuth(ctx)) return;
   const treeId = ctx.match[1];
-  const token = fsm.getToken(ctx.from.id);
-  try {
-    const { link } = await api.invite(treeId, token);
-    await ctx.reply(`🔗 Посилання-запрошення (7 днів):\n${link}`, { parse_mode: 'Markdown' });
-  } catch {
-    await ctx.reply('❌ Недостатньо прав або помилка');
-  }
+  const tree = fsm.getCurrentTree(ctx.from.id);
+  await sendInvite(ctx, treeId, tree.name || 'дерево');
 });
 
 // ─── Callback: edit_person ───────────────────────────────────────────────────
