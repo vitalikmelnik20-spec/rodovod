@@ -9,13 +9,14 @@ import { io } from 'socket.io-client';
 import 'reactflow/dist/style.css';
 import PersonNode from '../components/tree/PersonNode';
 import MarriageNode from '../components/tree/MarriageNode';
+import FamilyGroupNode from '../components/tree/FamilyGroupNode';
 import { buildGraphElements } from '../components/tree/treeLayout';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode };
+const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode, familyGroup: FamilyGroupNode };
 
 const TreeFlow = memo(function TreeFlow({ persons, relationships, onAddPerson }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);

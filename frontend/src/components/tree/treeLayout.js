@@ -4,6 +4,17 @@ const elk = new ELK();
 
 const NODE_W = 110;
 const NODE_H = 130;
+const GROUP_PAD = 28;
+const LABEL_H = 24;
+
+const GROUP_COLORS = [
+  { border: '#3B82F6', bg: 'rgba(59,130,246,0.05)' },
+  { border: '#8B5CF6', bg: 'rgba(139,92,246,0.05)' },
+  { border: '#10B981', bg: 'rgba(16,185,129,0.05)' },
+  { border: '#F59E0B', bg: 'rgba(245,158,11,0.05)' },
+  { border: '#EF4444', bg: 'rgba(239,68,68,0.05)' },
+  { border: '#06B6D4', bg: 'rgba(6,182,212,0.05)' },
+];
 
 const ELK_OPTIONS = {
   'elk.algorithm': 'layered',
@@ -17,6 +28,68 @@ const ELK_OPTIONS = {
 
 function spouseKey(a, b) {
   return [a, b].sort().join('__');
+}
+
+function detectFamilyGroups(persons, parentChildRels, spouseRels, personIds) {
+  const childrenOf = {};
+  parentChildRels.forEach(r => {
+    if (!childrenOf[r.person_a_id]) childrenOf[r.person_a_id] = [];
+    childrenOf[r.person_a_id].push(r.person_b_id);
+  });
+
+  const hasParent = new Set(
+    parentChildRels.map(r => r.person_b_id).filter(id => personIds.has(id))
+  );
+
+  const roots = persons.filter(p => !hasParent.has(p.id));
+  if (roots.length === 0) return [];
+
+  const spouseOf = {};
+  spouseRels.forEach(r => {
+    (spouseOf[r.person_a_id] = spouseOf[r.person_a_id] || []).push(r.person_b_id);
+    (spouseOf[r.person_b_id] = spouseOf[r.person_b_id] || []).push(r.person_a_id);
+  });
+
+  // Merge root pairs into single groups
+  const rootGroups = [];
+  const assignedRoots = new Set();
+  roots.forEach(root => {
+    if (assignedRoots.has(root.id)) return;
+    assignedRoots.add(root.id);
+    const group = [root.id];
+    (spouseOf[root.id] || []).forEach(sid => {
+      if (roots.some(r => r.id === sid) && !assignedRoots.has(sid)) {
+        assignedRoots.add(sid);
+        group.push(sid);
+      }
+    });
+    rootGroups.push(group);
+  });
+
+  const personToGroup = {};
+  return rootGroups.map((rootIds, i) => {
+    const members = new Set(rootIds);
+    const queue = [...rootIds];
+    rootIds.forEach(id => { personToGroup[id] = i; });
+
+    while (queue.length) {
+      const pid = queue.shift();
+      (childrenOf[pid] || []).forEach(childId => {
+        if (!members.has(childId) && personIds.has(childId)) {
+          members.add(childId);
+          if (personToGroup[childId] === undefined) personToGroup[childId] = i;
+          queue.push(childId);
+        }
+      });
+    }
+
+    const rootPersons = persons.filter(p => rootIds.includes(p.id));
+    const label = rootPersons.find(p => p.last_name)?.last_name
+      || rootPersons[0]?.first_name
+      || 'Родина';
+
+    return { id: `family_group_${i}`, members: [...members], label, colorIndex: i };
+  });
 }
 
 export async function buildGraphElements(persons, relationships) {
@@ -118,8 +191,39 @@ export async function buildGraphElements(persons, relationships) {
     });
   }
 
+  // ── Family group background nodes ─────────────────────────────────────────
+  const familyGroups = detectFamilyGroups(persons, parentChildRels, spouseRels, personIds);
+
+  const groupNodes = familyGroups.length >= 2
+    ? familyGroups.map(g => {
+        const memberPos = g.members.map(id => positions[id]).filter(Boolean);
+        if (!memberPos.length) return null;
+
+        const minX = Math.min(...memberPos.map(p => p.x));
+        const minY = Math.min(...memberPos.map(p => p.y));
+        const maxX = Math.max(...memberPos.map(p => p.x));
+        const maxY = Math.max(...memberPos.map(p => p.y));
+
+        const color = GROUP_COLORS[g.colorIndex % GROUP_COLORS.length];
+        return {
+          id: g.id,
+          type: 'familyGroup',
+          position: { x: minX - GROUP_PAD, y: minY - GROUP_PAD - LABEL_H },
+          style: {
+            width: maxX - minX + NODE_W + GROUP_PAD * 2,
+            height: maxY - minY + NODE_H + GROUP_PAD * 2 + LABEL_H,
+          },
+          data: { label: g.label, color: color.border, bg: color.bg },
+          zIndex: -1,
+          selectable: false,
+          draggable: false,
+        };
+      }).filter(Boolean)
+    : [];
+
   // ── React Flow nodes ───────────────────────────────────────────────────────
   const nodes = [
+    ...groupNodes,
     ...persons.map(p => ({
       id: p.id,
       type: 'personNode',

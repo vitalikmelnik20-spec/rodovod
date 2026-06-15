@@ -8,9 +8,10 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import PersonNode from '../components/tree/PersonNode';
 import MarriageNode from '../components/tree/MarriageNode';
+import FamilyGroupNode from '../components/tree/FamilyGroupNode';
 import { buildGraphElements } from '../components/tree/treeLayout';
 
-const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode };
+const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode, familyGroup: FamilyGroupNode };
 
 function TreeFlow({ persons, relationships, onNodeClick }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
