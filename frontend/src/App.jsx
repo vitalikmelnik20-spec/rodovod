@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { useTelegramApp } from './hooks/useTelegramApp';
+import { useTheme } from './hooks/useTheme';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import TreePage from './pages/TreePage';
@@ -33,6 +34,7 @@ function PrivateRoute({ children }) {
 
 export default function App() {
   const { tg } = useTelegramApp();
+  useTheme(); // initializes data-theme on <html> from localStorage / tg.colorScheme
 
   useEffect(() => {
     if (tg) {

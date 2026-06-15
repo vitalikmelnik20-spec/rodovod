@@ -13,6 +13,7 @@ import FamilyGroupNode from '../components/tree/FamilyGroupNode';
 import AddPersonModal from '../components/tree/AddPersonModal';
 import { buildGraphElements } from '../components/tree/treeLayout';
 import { useAuthStore } from '../store/authStore';
+import { useTheme } from '../hooks/useTheme';
 import api from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -20,7 +21,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode, familyGroup: FamilyGroupNode };
 
 // layoutKey triggers full graph rebuild: count + filter state + highlight
-const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey }) {
+const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, theme, toggleTheme }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
@@ -36,6 +37,19 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey }) {
     });
   }, [layoutKey]);
 
+  const btnStyle = {
+    width: 44, height: 44,
+    background: 'var(--controls-bg)',
+    border: '1px solid var(--controls-border)',
+    borderRadius: 12,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--controls-icon)',
+    fontSize: 18,
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    transition: 'all 0.15s',
+  };
+
   return (
     <ReactFlow
       nodes={nodes} edges={edges}
@@ -47,17 +61,30 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey }) {
       zoomOnDoubleClick={false} preventScrolling={true}
       nodesDraggable={false} nodesConnectable={false}
       proOptions={{ hideAttribution: true }}
-      style={{ background: '#0F172A' }}>
-      <Background color="#1e293b" gap={24} size={1} />
+      style={{ background: 'var(--bg-graph)' }}>
+
+      <Background color="var(--graph-dot)" gap={24} size={1} />
       <Controls style={{ bottom: 130, right: 12, top: 'auto' }} showInteractive={false} />
       <MiniMap
-        style={{ bottom: 130, left: 12, top: 'auto', background: '#1e293b', border: '1px solid #334155' }}
-        nodeColor={n => n.data.highlighted ? '#F59E0B' : n.data.is_alive ? '#3B82F6' : '#475569'}
-        maskColor="rgba(15,23,42,0.7)" />
-      <div style={{ position: 'absolute', bottom: 80, right: 12, zIndex: 10 }}>
+        style={{
+          bottom: 130, left: 12, top: 'auto',
+          background: 'var(--minimap-bg)',
+          border: '1px solid var(--controls-border)',
+        }}
+        nodeColor={n => n.data.highlighted ? '#F59E0B' : n.data.is_alive ? 'var(--accent)' : 'var(--line-color)'}
+        maskColor="var(--minimap-mask)" />
+
+      {/* Navigation buttons — bottom right */}
+      <div style={{ position: 'absolute', bottom: 80, right: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button
+          onClick={toggleTheme}
+          style={btnStyle}
+          title={theme === 'light' ? 'Темна тема' : 'Світла тема'}>
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
         <button
           onClick={() => fitView({ padding: 0.15, duration: 400 })}
-          className="w-11 h-11 bg-slate-800 border border-slate-600 rounded-xl flex items-center justify-center text-slate-300 active:scale-90 transition-all shadow-lg"
+          style={btnStyle}
           title="Показати все">
           ⊞
         </button>
@@ -70,6 +97,7 @@ export default function TreePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const token = useAuthStore(s => s.accessToken);
+  const { theme, toggleTheme } = useTheme();
   const [tree, setTree] = useState(null);
   const [persons, setPersons] = useState([]);
   const [relationships, setRelationships] = useState([]);
@@ -203,7 +231,7 @@ export default function TreePage() {
           </div>
         ) : (
           <ReactFlowProvider>
-            <TreeFlow persons={filteredPersons} relationships={relationships} layoutKey={layoutKey} />
+            <TreeFlow persons={filteredPersons} relationships={relationships} layoutKey={layoutKey} theme={theme} toggleTheme={toggleTheme} />
           </ReactFlowProvider>
         )}
       </div>
