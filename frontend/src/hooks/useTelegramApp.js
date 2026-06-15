@@ -16,5 +16,7 @@ export function useTelegramApp() {
     setReady(true);
   }, []);
 
-  return { tg, ready, initData: window.Telegram?.WebApp?.initData || null };
+  const initData = window.Telegram?.WebApp?.initData || null;
+  const isTelegramApp = !!window.Telegram?.WebApp;
+  return { tg, ready, initData, isTelegramApp };
 }
