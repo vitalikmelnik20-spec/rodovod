@@ -52,11 +52,21 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, onAddPerson })
       proOptions={{ hideAttribution: true }}
       style={{ background: '#0F172A' }}>
       <Background color="#1e293b" gap={24} size={1} />
-      <Controls style={{ bottom: 80, right: 12, top: 'auto' }} showInteractive={false} />
+      <Controls style={{ bottom: 130, right: 12, top: 'auto' }} showInteractive={false} />
       <MiniMap
-        style={{ bottom: 80, left: 12, top: 'auto', background: '#1e293b', border: '1px solid #334155' }}
+        style={{ bottom: 130, left: 12, top: 'auto', background: '#1e293b', border: '1px solid #334155' }}
         nodeColor={n => n.data.is_alive ? '#3B82F6' : '#475569'}
         maskColor="rgba(15,23,42,0.7)" />
+      {/* 4.4 — кнопка "Показати все" */}
+      <div style={{ position: 'absolute', bottom: 80, right: 12, zIndex: 10 }}>
+        <button
+          onClick={() => fitView({ padding: 0.15, duration: 400 })}
+          className="w-11 h-11 bg-slate-800 border border-slate-600 rounded-xl flex items-center justify-center text-slate-300 active:scale-90 transition-all shadow-lg"
+          title="Показати все"
+        >
+          ⊞
+        </button>
+      </div>
     </ReactFlow>
   );
 });

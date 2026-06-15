@@ -51,6 +51,27 @@ router.get('/:id/persons/:pid', requireAuth, requireTreeRole(['admin', 'editor',
   }
 });
 
+// GET /api/trees/:id/persons/:pid/relationships — 4.6 bidirectional
+// Returns all relationships where this person is person_a OR person_b
+router.get('/:id/persons/:pid/relationships', requireAuth, requireTreeRole(['admin', 'editor', 'viewer']), async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT r.*,
+        pa.id AS pa_id, pa.first_name AS pa_first, pa.last_name AS pa_last, pa.gender AS pa_gender, pa.avatar_url AS pa_avatar, pa.is_alive AS pa_alive,
+        pb.id AS pb_id, pb.first_name AS pb_first, pb.last_name AS pb_last, pb.gender AS pb_gender, pb.avatar_url AS pb_avatar, pb.is_alive AS pb_alive
+       FROM relationships r
+       JOIN persons pa ON pa.id = r.person_a_id
+       JOIN persons pb ON pb.id = r.person_b_id
+       WHERE r.tree_id = $1 AND (r.person_a_id = $2 OR r.person_b_id = $2)`,
+      [req.params.id, req.params.pid]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/trees/:id/persons
 router.post('/:id/persons', requireAuth, requireTreeRole(['admin', 'editor']), async (req, res) => {
   const { first_name, last_name, patronymic, birth_date, death_date,

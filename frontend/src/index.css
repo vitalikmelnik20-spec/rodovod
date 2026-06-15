@@ -5,6 +5,34 @@
 :root {
   --tg-color-scheme: dark;
   color-scheme: dark;
+  --app-height: 100vh;
+}
+
+/* 4.2 — правильна висота для контейнера графу */
+.graph-container {
+  width: 100%;
+  height: var(--app-height);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Full-screen форма (5.1) */
+.form-fullscreen {
+  position: fixed;
+  inset: 0;
+  height: var(--app-height);
+  background: #0F172A;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.form-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  padding-bottom: 100px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
