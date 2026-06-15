@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Background, Controls, MiniMap,
@@ -10,6 +10,7 @@ import 'reactflow/dist/style.css';
 import PersonNode from '../components/tree/PersonNode';
 import MarriageNode from '../components/tree/MarriageNode';
 import FamilyGroupNode from '../components/tree/FamilyGroupNode';
+import AddPersonModal from '../components/tree/AddPersonModal';
 import { buildGraphElements } from '../components/tree/treeLayout';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
@@ -81,8 +82,6 @@ export default function TreePage() {
   const [relationships, setRelationships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ first_name: '', last_name: '', gender: '' });
-  const [adding, setAdding] = useState(false);
   const socketRef = useRef(null);
 
   useEffect(() => { loadAll(); }, [id]);
@@ -114,18 +113,6 @@ export default function TreePage() {
       setRelationships(relsRes.data);
     } catch { }
     setLoading(false);
-  }
-
-  async function addPerson() {
-    if (!addForm.first_name && !addForm.last_name) return;
-    setAdding(true);
-    try {
-      const res = await api.post(`/trees/${id}/persons`, addForm);
-      setPersons(prev => [...prev, res.data]);
-      setAddForm({ first_name: '', last_name: '', gender: '' });
-      setShowAddModal(false);
-    } catch { }
-    setAdding(false);
   }
 
   if (loading) return (
@@ -172,46 +159,14 @@ export default function TreePage() {
         )}
       </div>
 
-      {/* Модалка додавання */}
+      {/* Full-screen форма додавання (5.1) */}
       {showAddModal && (
-        <div className="absolute inset-0 z-50 flex items-end bg-black/60" onClick={e => e.target === e.currentTarget && setShowAddModal(false)}>
-          <div className="w-full bg-slate-900 rounded-t-3xl p-5 border-t border-slate-700"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
-            <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-5" />
-            <h3 className="text-white font-bold text-lg mb-4">➕ Нова особа</h3>
-            <div className="flex flex-col gap-3 mb-4">
-              <input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))}
-                placeholder="Прізвище" autoFocus
-                className="bg-slate-800 text-white rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 text-base" />
-              <input value={addForm.first_name} onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))}
-                placeholder="Ім'я"
-                className="bg-slate-800 text-white rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 text-base" />
-              <div className="flex gap-2">
-                {[{ v: 'male', label: '♂ Чоловік' }, { v: 'female', label: '♀ Жінка' }, { v: '', label: '— Не вказано' }].map(opt => (
-                  <button key={opt.v} type="button"
-                    onClick={() => setAddForm(f => ({ ...f, gender: opt.v }))}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      addForm.gender === opt.v
-                        ? opt.v === 'male' ? 'bg-blue-600 text-white' : opt.v === 'female' ? 'bg-pink-600 text-white' : 'bg-slate-600 text-white'
-                        : 'bg-slate-800 text-slate-400 border border-slate-700'
-                    }`}>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setShowAddModal(false)}
-                className="flex-1 bg-slate-800 text-slate-300 font-semibold py-3.5 rounded-2xl">
-                Скасувати
-              </button>
-              <button onClick={addPerson} disabled={adding || (!addForm.first_name && !addForm.last_name)}
-                className="flex-1 bg-blue-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-2xl active:scale-95 transition-all">
-                {adding ? '...' : 'Додати'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddPersonModal
+          treeId={id}
+          allPersons={persons}
+          onClose={() => setShowAddModal(false)}
+          onCreated={(p) => { setPersons(prev => [...prev, p]); setShowAddModal(false); }}
+        />
       )}
     </div>
   );
