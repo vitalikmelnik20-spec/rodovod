@@ -16,10 +16,14 @@ const GROUP_COLORS = [
   { border: '#06B6D4', bg: 'rgba(6,182,212,0.05)' },
 ];
 
+// USER_DEFINED layering lets us force nodes onto specific layers.
+// Persons occupy even layers (0, 2, 4, …); marriage nodes occupy the
+// odd layer immediately below their spouses (1, 3, 5, …).
 const ELK_OPTIONS = {
   'elk.algorithm': 'layered',
   'elk.direction': 'DOWN',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+  'elk.layered.layering.strategy': 'USER_DEFINED',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '60',
   'elk.spacing.nodeNode': '80',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
   'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
@@ -28,6 +32,65 @@ const ELK_OPTIONS = {
 
 function spouseKey(a, b) {
   return [a, b].sort().join('__');
+}
+
+// Compute ELK layer IDs for persons using even numbers (0, 2, 4, …)
+// so marriage connector nodes can sit on the odd layer in between.
+// Algorithm:
+//  1. Topological sort of parent→child edges to assign initial layers.
+//  2. Spouse alignment: both spouses get the same (max) layer.
+//  3. Re-propagate children layers after spouse adjustment.
+function computePersonLayers(persons, parentChildRels, spouseRels, personIds) {
+  const parentsOf = {};
+  const childrenOf = {};
+  parentChildRels.forEach(r => {
+    if (!personIds.has(r.person_a_id) || !personIds.has(r.person_b_id)) return;
+    (parentsOf[r.person_b_id] = parentsOf[r.person_b_id] || []).push(r.person_a_id);
+    (childrenOf[r.person_a_id] = childrenOf[r.person_a_id] || []).push(r.person_b_id);
+  });
+
+  // Kahn's topological sort
+  const inDeg = {};
+  persons.forEach(p => { inDeg[p.id] = (parentsOf[p.id] || []).length; });
+  const topo = [];
+  const q = persons.filter(p => inDeg[p.id] === 0).map(p => p.id);
+  while (q.length) {
+    const id = q.shift();
+    topo.push(id);
+    (childrenOf[id] || []).forEach(cid => {
+      if (--inDeg[cid] === 0) q.push(cid);
+    });
+  }
+  // Catch any cycles (just append remaining)
+  persons.forEach(p => { if (!topo.includes(p.id)) topo.push(p.id); });
+
+  // Assign layers; children are 2 levels below their deepest parent
+  // (the gap is reserved for the marriage connector node).
+  const layer = {};
+  const assignLayers = () => {
+    topo.forEach(id => {
+      const pLayers = (parentsOf[id] || []).map(pid => layer[pid] ?? 0);
+      layer[id] = pLayers.length ? Math.max(...pLayers) + 2 : (layer[id] ?? 0);
+    });
+  };
+  assignLayers();
+
+  // Align spouses to the same (max) layer and re-propagate until stable
+  let changed = true;
+  while (changed) {
+    changed = false;
+    spouseRels.forEach(r => {
+      if (!personIds.has(r.person_a_id) || !personIds.has(r.person_b_id)) return;
+      const la = layer[r.person_a_id] ?? 0;
+      const lb = layer[r.person_b_id] ?? 0;
+      const maxL = Math.max(la, lb);
+      if (la < maxL) { layer[r.person_a_id] = maxL; changed = true; }
+      if (lb < maxL) { layer[r.person_b_id] = maxL; changed = true; }
+    });
+    if (changed) assignLayers();
+  }
+
+  return layer;
 }
 
 function detectFamilyGroups(persons, parentChildRels, spouseRels, personIds) {
@@ -50,7 +113,6 @@ function detectFamilyGroups(persons, parentChildRels, spouseRels, personIds) {
     (spouseOf[r.person_b_id] = spouseOf[r.person_b_id] || []).push(r.person_a_id);
   });
 
-  // Merge root pairs into single groups
   const rootGroups = [];
   const assignedRoots = new Set();
   roots.forEach(root => {
@@ -97,15 +159,17 @@ export async function buildGraphElements(persons, relationships) {
 
   const personIds = new Set(persons.map(p => p.id));
 
-  const spouseRels    = relationships.filter(r => r.relation_type === 'spouse' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
+  const spouseRels      = relationships.filter(r => r.relation_type === 'spouse' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
   const parentChildRels = relationships.filter(r => (r.relation_type === 'parent_child' || r.relation_type === 'adoption') && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
-  const siblingRels   = relationships.filter(r => r.relation_type === 'sibling' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
-  const otherRels     = relationships.filter(r => r.relation_type === 'other' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
+  const siblingRels     = relationships.filter(r => r.relation_type === 'sibling' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
+  const otherRels       = relationships.filter(r => r.relation_type === 'other' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
 
-  // ── Marriage nodes ──────────────────────────────────────────────────────────
-  // One marriage node per spouse pair (hidden connector)
-  const spousePairToMarriage = {}; // key → marriageNodeId
-  const marriageDefs = [];         // { id, personA, personB }
+  // ── Pre-compute layer IDs ───────────────────────────────────────────────
+  const personLayer = computePersonLayers(persons, parentChildRels, spouseRels, personIds);
+
+  // ── Marriage nodes ──────────────────────────────────────────────────────
+  const spousePairToMarriage = {};
+  const marriageDefs = [];
 
   spouseRels.forEach(rel => {
     const key = spouseKey(rel.person_a_id, rel.person_b_id);
@@ -116,7 +180,7 @@ export async function buildGraphElements(persons, relationships) {
     }
   });
 
-  // ── Child → parents map ─────────────────────────────────────────────────────
+  // ── Child → parents map ─────────────────────────────────────────────────
   const childParents = {};
   parentChildRels.forEach(r => {
     childParents[r.person_b_id] = childParents[r.person_b_id] || [];
@@ -125,9 +189,9 @@ export async function buildGraphElements(persons, relationships) {
     }
   });
 
-  // ── Compute parent→child ELK edges (route via marriage node if possible) ───
-  const pcEdges = [];        // { id, source, target, relType }
-  const routedViaMarriage = new Set(); // "marriageId__childId"
+  // ── Parent→child ELK edges (route via marriage node if possible) ────────
+  const pcEdges = [];
+  const routedViaMarriage = new Set();
 
   parentChildRels.forEach(rel => {
     const parentId = rel.person_a_id;
@@ -147,32 +211,40 @@ export async function buildGraphElements(persons, relationships) {
         break;
       }
     }
-
     if (!routed) {
       pcEdges.push({ id: `pc_${rel.id}`, source: parentId, target: childId, relType: rel.relation_type });
     }
   });
 
-  // ── Build ELK graph ────────────────────────────────────────────────────────
+  // ── Build ELK graph ─────────────────────────────────────────────────────
   const elkGraph = {
     id: 'root',
     layoutOptions: ELK_OPTIONS,
     children: [
-      ...persons.map(p => ({ id: p.id, width: NODE_W, height: NODE_H })),
-      ...marriageDefs.map(m => ({ id: m.id, width: 1, height: 1 })),
+      ...persons.map(p => ({
+        id: p.id,
+        width: NODE_W,
+        height: NODE_H,
+        properties: { 'elk.layered.layering.layerId': personLayer[p.id] ?? 0 },
+      })),
+      ...marriageDefs.map(m => ({
+        id: m.id,
+        width: 1,
+        height: 1,
+        // Marriage connector sits one layer below its spouses
+        properties: { 'elk.layered.layering.layerId': (personLayer[m.personA] ?? 0) + 1 },
+      })),
     ],
     edges: [
-      // Spouse → marriage node
       ...marriageDefs.flatMap(m => ([
         { id: `ms_${m.id}_a`, sources: [m.personA], targets: [m.id] },
         { id: `ms_${m.id}_b`, sources: [m.personB], targets: [m.id] },
       ])),
-      // Parent / marriage node → child
       ...pcEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
     ],
   };
 
-  // ── Run ELK layout ─────────────────────────────────────────────────────────
+  // ── Run ELK layout ──────────────────────────────────────────────────────
   const positions = {};
   try {
     const layouted = await elk.layout(elkGraph);
@@ -191,7 +263,7 @@ export async function buildGraphElements(persons, relationships) {
     });
   }
 
-  // ── Family group background nodes ─────────────────────────────────────────
+  // ── Family group background nodes ───────────────────────────────────────
   const familyGroups = detectFamilyGroups(persons, parentChildRels, spouseRels, personIds);
 
   const groupNodes = familyGroups.length >= 2
@@ -221,7 +293,7 @@ export async function buildGraphElements(persons, relationships) {
       }).filter(Boolean)
     : [];
 
-  // ── React Flow nodes ───────────────────────────────────────────────────────
+  // ── React Flow nodes ────────────────────────────────────────────────────
   const nodes = [
     ...groupNodes,
     ...persons.map(p => ({
@@ -239,10 +311,9 @@ export async function buildGraphElements(persons, relationships) {
     })),
   ];
 
-  // ── React Flow edges ───────────────────────────────────────────────────────
+  // ── React Flow edges ────────────────────────────────────────────────────
   const edges = [];
 
-  // Spouse → marriage (red lines)
   marriageDefs.forEach(m => {
     edges.push(
       { id: `rfe_${m.id}_a`, source: m.personA, target: m.id, type: 'smoothstep', style: { stroke: '#EF4444', strokeWidth: 2 } },
@@ -250,7 +321,6 @@ export async function buildGraphElements(persons, relationships) {
     );
   });
 
-  // Parent / marriage → child (blue / green)
   pcEdges.forEach(e => {
     const isAdoption = e.relType === 'adoption';
     edges.push({
@@ -267,7 +337,6 @@ export async function buildGraphElements(persons, relationships) {
     });
   });
 
-  // Sibling (purple, horizontal)
   siblingRels.forEach(r => {
     const posA = positions[r.person_a_id];
     const posB = positions[r.person_b_id];
@@ -283,7 +352,6 @@ export async function buildGraphElements(persons, relationships) {
     });
   });
 
-  // Other (grey, dashed)
   otherRels.forEach(r => {
     edges.push({
       id: r.id,
