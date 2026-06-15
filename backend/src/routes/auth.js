@@ -50,7 +50,7 @@ router.post('/telegram', async (req, res) => {
   }
 });
 
-// POST /api/auth/telegram/widget — Telegram Login Widget
+// POST /api/auth/telegram/widget — Telegram Login Widget (callback mode)
 router.post('/telegram/widget', async (req, res) => {
   try {
     const telegramUser = verifyTelegramLoginWidget(req.body);
@@ -62,6 +62,28 @@ router.post('/telegram/widget', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/auth/telegram/widget/redirect — Telegram Login Widget (redirect mode for Telegram browser)
+router.get('/telegram/widget/redirect', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || '';
+  try {
+    const telegramUser = verifyTelegramLoginWidget(req.query);
+    if (!telegramUser) {
+      return res.redirect(`${frontendUrl}/login?error=invalid`);
+    }
+    const user = await upsertUser(telegramUser);
+    const tokens = generateTokens(user.telegram_id);
+    const params = new URLSearchParams({
+      access: tokens.access,
+      refresh: tokens.refresh,
+      user: JSON.stringify(user),
+    });
+    res.redirect(`${frontendUrl}/login?${params}`);
+  } catch (err) {
+    console.error(err);
+    res.redirect(`${frontendUrl}/login?error=server`);
   }
 });
 
