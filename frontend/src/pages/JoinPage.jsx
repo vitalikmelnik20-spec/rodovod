@@ -12,6 +12,8 @@ export default function JoinPage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [joined, setJoined] = useState(false);
+  const [joinedTreeId, setJoinedTreeId] = useState(null);
 
   useEffect(() => {
     async function fetchInvite() {
@@ -35,21 +37,42 @@ export default function JoinPage() {
     setJoining(true);
     try {
       const res = await api.post(`/trees/join/${token}`);
-      navigate(`/tree/${res.data.tree_id}`, { replace: true });
+      setJoinedTreeId(res.data.tree_id);
+      setJoined(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Помилка. Спробуйте ще раз.');
       setJoining(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900">
-        <div className="text-6xl mb-4 animate-pulse">🌳</div>
-        <p className="text-slate-400">Завантаження...</p>
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900">
+      <div className="text-6xl mb-4 animate-pulse">🌳</div>
+      <p className="text-slate-400">Завантаження...</p>
+    </div>
+  );
+
+  // 6.3 — after join: find yourself prompt
+  if (joined) return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 px-6 text-center">
+      <div className="text-7xl mb-6">🎉</div>
+      <h2 className="text-white text-2xl font-bold mb-2">Ви приєднались!</h2>
+      <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+        Чи є ви в цьому дереві?<br />
+        Знайдіть себе, щоб прив'язати свій акаунт до вузла.
+      </p>
+      <div className="w-full max-w-xs flex flex-col gap-3">
+        <button onClick={() => navigate(`/tree/${joinedTreeId}/search`, { replace: true })}
+          className="w-full bg-blue-600 active:scale-[0.98] text-white font-semibold py-4 rounded-2xl text-base transition-all">
+          🔍 Знайти себе в дереві
+        </button>
+        <button onClick={() => navigate(`/tree/${joinedTreeId}`, { replace: true })}
+          className="w-full bg-slate-800 active:scale-[0.98] text-slate-300 font-semibold py-4 rounded-2xl text-base transition-all">
+          Відкрити дерево
+        </button>
       </div>
-    );
-  }
+    </div>
+  );
 
   if (notFound) {
     return (

@@ -136,6 +136,9 @@ router.post('/join/:token', requireAuth, async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'Invalid or expired invite' });
     const invite = rows[0];
+    if (invite.max_uses !== null && invite.used_count >= invite.max_uses) {
+      return res.status(410).json({ error: 'Invite link has reached its usage limit' });
+    }
     await query(
       `INSERT INTO tree_members (tree_id, telegram_user_id, role, status, invited_by)
        VALUES ($1, $2, 'editor', 'active', $3)
@@ -168,14 +171,19 @@ router.get('/:id/members', requireAuth, requireTreeRole(['admin', 'editor', 'vie
   }
 });
 
-// POST /api/trees/:id/invite — генерувати посилання-запрошення
+// POST /api/trees/:id/invite — генерувати посилання-запрошення (6.1)
 router.post('/:id/invite', requireAuth, requireTreeRole(['admin']), async (req, res) => {
+  const { expires_in_days, max_uses } = req.body;
+  const validDays = [1, 7, 30];
+  const days = validDays.includes(Number(expires_in_days)) ? Number(expires_in_days) : 7;
+  const maxUses = max_uses && Number(max_uses) > 0 ? Number(max_uses) : null;
+
   try {
     const token = crypto.randomBytes(16).toString('hex');
     const { rows } = await query(
-      `INSERT INTO invite_links (tree_id, token, created_by, expires_at)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '7 days') RETURNING *`,
-      [req.params.id, token, req.user.telegram_id]
+      `INSERT INTO invite_links (tree_id, token, created_by, expires_at, max_uses)
+       VALUES ($1, $2, $3, NOW() + ($4 || ' days')::INTERVAL, $5) RETURNING *`,
+      [req.params.id, token, req.user.telegram_id, String(days), maxUses]
     );
     const baseUrl = process.env.FRONTEND_URL ||
       (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:5173');
@@ -183,10 +191,12 @@ router.post('/:id/invite', requireAuth, requireTreeRole(['admin']), async (req, 
     res.json({
       token,
       expires_at: rows[0].expires_at,
+      expires_in_days: days,
+      max_uses: maxUses,
       links: {
-        web:     `${baseUrl}/join/${token}`,
-        bot:     `https://t.me/${botUsername}?start=inv_${token}`,
-        webapp:  `https://t.me/${botUsername}/app?startapp=inv_${token}`,
+        web:    `${baseUrl}/join/${token}`,
+        bot:    `https://t.me/${botUsername}?start=inv_${token}`,
+        webapp: `https://t.me/${botUsername}/app?startapp=inv_${token}`,
       },
     });
   } catch (err) {
