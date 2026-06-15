@@ -7,7 +7,7 @@ import api from '../services/api';
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'csacas_bot';
 
 export default function LoginPage() {
-  const { ready, initData, isTelegramApp } = useTelegramApp();
+  const { ready, initData } = useTelegramApp();
   const login = useAuthStore(s => s.login);
   const user = useAuthStore(s => s.user);
   const navigate = useNavigate();
@@ -48,8 +48,7 @@ export default function LoginPage() {
     } else if (user) {
       navigate('/', { replace: true });
     } else {
-      // In Telegram browser: use redirect mode; in regular browser: use popup/callback mode
-      mountWidget(isTelegramApp);
+      mountWidget();
     }
   }, [ready]);
 
@@ -65,9 +64,8 @@ export default function LoginPage() {
     }
   }
 
-  function mountWidget(useRedirect = false) {
+  function mountWidget() {
     if (!widgetRef.current) return;
-
     const script = document.createElement('script');
     script.src = 'https://telegram.org/js/telegram-widget.js?22';
     script.setAttribute('data-telegram-login', BOT_USERNAME);
@@ -75,27 +73,8 @@ export default function LoginPage() {
     script.setAttribute('data-userpic', 'true');
     script.setAttribute('data-radius', '12');
     script.setAttribute('data-request-access', 'write');
-
-    if (useRedirect) {
-      // Redirect mode: page navigates to backend, backend redirects back with tokens
-      script.setAttribute('data-auth-url', `${window.location.origin}/api/auth/telegram/widget/redirect`);
-    } else {
-      // Popup/callback mode: works in regular browsers
-      window.onTelegramWidgetAuth = async (data) => {
-        setLoading(true);
-        setError(null);
-        try {
-          const res = await api.post('/auth/telegram/widget', data);
-          login(res.data.user, res.data.access, res.data.refresh);
-          navigate('/', { replace: true });
-        } catch {
-          setError('Помилка авторизації. Спробуйте ще раз.');
-          setLoading(false);
-        }
-      };
-      script.setAttribute('data-onauth', 'onTelegramWidgetAuth(user)');
-    }
-
+    // Always use redirect mode — works in all browsers including Telegram in-app browser
+    script.setAttribute('data-auth-url', `${window.location.origin}/api/auth/telegram/widget/redirect`);
     script.async = true;
     widgetRef.current.innerHTML = '';
     widgetRef.current.appendChild(script);
