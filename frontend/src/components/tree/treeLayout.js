@@ -1,140 +1,193 @@
+import ELK from 'elkjs/lib/elk.bundled.js';
+
+const elk = new ELK();
+
 const NODE_W = 110;
 const NODE_H = 130;
-const H_GAP = 30;
-const V_GAP = 80;
 
-export function buildGraphElements(persons, relationships) {
+const ELK_OPTIONS = {
+  'elk.algorithm': 'layered',
+  'elk.direction': 'DOWN',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+  'elk.spacing.nodeNode': '80',
+  'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+  'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+  'elk.layered.compaction.postCompaction.strategy': 'EDGE_LENGTH',
+};
+
+function spouseKey(a, b) {
+  return [a, b].sort().join('__');
+}
+
+export async function buildGraphElements(persons, relationships) {
   if (!persons.length) return { nodes: [], edges: [] };
 
-  const children = {};
-  const parents = {};
-  const spouses = {};
-  const siblings = {};
+  const personIds = new Set(persons.map(p => p.id));
 
-  persons.forEach(p => {
-    children[p.id] = [];
-    parents[p.id] = [];
-    spouses[p.id] = [];
-    siblings[p.id] = [];
-  });
+  const spouseRels    = relationships.filter(r => r.relation_type === 'spouse' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
+  const parentChildRels = relationships.filter(r => (r.relation_type === 'parent_child' || r.relation_type === 'adoption') && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
+  const siblingRels   = relationships.filter(r => r.relation_type === 'sibling' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
+  const otherRels     = relationships.filter(r => r.relation_type === 'other' && personIds.has(r.person_a_id) && personIds.has(r.person_b_id));
 
-  relationships.forEach(r => {
-    if (r.relation_type === 'parent_child' || r.relation_type === 'adoption') {
-      children[r.person_a_id]?.push(r.person_b_id);
-      parents[r.person_b_id]?.push(r.person_a_id);
-    } else if (r.relation_type === 'spouse') {
-      spouses[r.person_a_id]?.push(r.person_b_id);
-      spouses[r.person_b_id]?.push(r.person_a_id);
-    } else if (r.relation_type === 'sibling') {
-      siblings[r.person_a_id]?.push(r.person_b_id);
-      siblings[r.person_b_id]?.push(r.person_a_id);
+  // ── Marriage nodes ──────────────────────────────────────────────────────────
+  // One marriage node per spouse pair (hidden connector)
+  const spousePairToMarriage = {}; // key → marriageNodeId
+  const marriageDefs = [];         // { id, personA, personB }
+
+  spouseRels.forEach(rel => {
+    const key = spouseKey(rel.person_a_id, rel.person_b_id);
+    if (!spousePairToMarriage[key]) {
+      const mId = `marriage_${rel.id}`;
+      spousePairToMarriage[key] = mId;
+      marriageDefs.push({ id: mId, personA: rel.person_a_id, personB: rel.person_b_id });
     }
   });
 
-  // BFS by levels from roots (people with no parents)
-  const roots = persons.filter(p => parents[p.id].length === 0).map(p => p.id);
-  const levels = {};
-  const visited = new Set();
-  const queue = roots.map(id => ({ id, level: 0 }));
-  if (!queue.length && persons.length) queue.push({ id: persons[0].id, level: 0 });
+  // ── Child → parents map ─────────────────────────────────────────────────────
+  const childParents = {};
+  parentChildRels.forEach(r => {
+    childParents[r.person_b_id] = childParents[r.person_b_id] || [];
+    if (!childParents[r.person_b_id].includes(r.person_a_id)) {
+      childParents[r.person_b_id].push(r.person_a_id);
+    }
+  });
 
-  while (queue.length) {
-    const { id, level } = queue.shift();
-    if (visited.has(id)) continue;
-    visited.add(id);
-    levels[id] = level;
-    children[id]?.forEach(cid => {
-      if (!visited.has(cid)) queue.push({ id: cid, level: level + 1 });
+  // ── Compute parent→child ELK edges (route via marriage node if possible) ───
+  const pcEdges = [];        // { id, source, target, relType }
+  const routedViaMarriage = new Set(); // "marriageId__childId"
+
+  parentChildRels.forEach(rel => {
+    const parentId = rel.person_a_id;
+    const childId  = rel.person_b_id;
+    const coParents = (childParents[childId] || []).filter(p => p !== parentId);
+
+    let routed = false;
+    for (const coParent of coParents) {
+      const mId = spousePairToMarriage[spouseKey(parentId, coParent)];
+      if (mId) {
+        const mk = `${mId}__${childId}`;
+        if (!routedViaMarriage.has(mk)) {
+          routedViaMarriage.add(mk);
+          pcEdges.push({ id: `pc_${mId}_${childId}`, source: mId, target: childId, relType: rel.relation_type });
+        }
+        routed = true;
+        break;
+      }
+    }
+
+    if (!routed) {
+      pcEdges.push({ id: `pc_${rel.id}`, source: parentId, target: childId, relType: rel.relation_type });
+    }
+  });
+
+  // ── Build ELK graph ────────────────────────────────────────────────────────
+  const elkGraph = {
+    id: 'root',
+    layoutOptions: ELK_OPTIONS,
+    children: [
+      ...persons.map(p => ({ id: p.id, width: NODE_W, height: NODE_H })),
+      ...marriageDefs.map(m => ({ id: m.id, width: 1, height: 1 })),
+    ],
+    edges: [
+      // Spouse → marriage node
+      ...marriageDefs.flatMap(m => ([
+        { id: `ms_${m.id}_a`, sources: [m.personA], targets: [m.id] },
+        { id: `ms_${m.id}_b`, sources: [m.personB], targets: [m.id] },
+      ])),
+      // Parent / marriage node → child
+      ...pcEdges.map(e => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    ],
+  };
+
+  // ── Run ELK layout ─────────────────────────────────────────────────────────
+  const positions = {};
+  try {
+    const layouted = await elk.layout(elkGraph);
+    layouted.children.forEach(n => {
+      positions[n.id] = { x: n.x ?? 0, y: n.y ?? 0 };
     });
-    // Handle islands
-    persons.forEach(p => {
-      if (!visited.has(p.id)) queue.push({ id: p.id, level: 0 });
+  } catch (err) {
+    console.warn('[treeLayout] ELK failed, using grid fallback:', err.message);
+    persons.forEach((p, i) => {
+      positions[p.id] = { x: (i % 5) * 150, y: Math.floor(i / 5) * 180 };
+    });
+    marriageDefs.forEach(m => {
+      const a = positions[m.personA] || { x: 0, y: 0 };
+      const b = positions[m.personB] || { x: 0, y: 0 };
+      positions[m.id] = { x: (a.x + b.x) / 2, y: Math.max(a.y, b.y) + 60 };
     });
   }
 
-  // Enforce same level for explicit siblings
-  relationships
-    .filter(r => r.relation_type === 'sibling')
-    .forEach(r => {
-      const lvlA = levels[r.person_a_id];
-      const lvlB = levels[r.person_b_id];
-      if (lvlA !== undefined && lvlB !== undefined) {
-        const same = Math.min(lvlA, lvlB);
-        levels[r.person_a_id] = same;
-        levels[r.person_b_id] = same;
-      } else if (lvlA !== undefined) {
-        levels[r.person_b_id] = lvlA;
-      } else if (lvlB !== undefined) {
-        levels[r.person_a_id] = lvlB;
-      }
-    });
+  // ── React Flow nodes ───────────────────────────────────────────────────────
+  const nodes = [
+    ...persons.map(p => ({
+      id: p.id,
+      type: 'personNode',
+      position: positions[p.id] || { x: 0, y: 0 },
+      data: { ...p },
+    })),
+    ...marriageDefs.map(m => ({
+      id: m.id,
+      type: 'marriageNode',
+      position: positions[m.id] || { x: 0, y: 0 },
+      data: {},
+      style: { width: 1, height: 1 },
+    })),
+  ];
 
-  // Group by level
-  const byLevel = {};
-  Object.entries(levels).forEach(([id, lvl]) => {
-    byLevel[lvl] = byLevel[lvl] || [];
-    byLevel[lvl].push(id);
+  // ── React Flow edges ───────────────────────────────────────────────────────
+  const edges = [];
+
+  // Spouse → marriage (red lines)
+  marriageDefs.forEach(m => {
+    edges.push(
+      { id: `rfe_${m.id}_a`, source: m.personA, target: m.id, type: 'smoothstep', style: { stroke: '#EF4444', strokeWidth: 2 } },
+      { id: `rfe_${m.id}_b`, source: m.personB, target: m.id, type: 'smoothstep', style: { stroke: '#EF4444', strokeWidth: 2 } },
+    );
   });
 
-  // Compute positions
-  const positions = {};
-  Object.entries(byLevel).forEach(([lvl, ids]) => {
-    const totalW = ids.length * NODE_W + (ids.length - 1) * H_GAP;
-    ids.forEach((id, i) => {
-      positions[id] = {
-        x: i * (NODE_W + H_GAP) - totalW / 2,
-        y: parseInt(lvl) * (NODE_H + V_GAP),
-      };
+  // Parent / marriage → child (blue / green)
+  pcEdges.forEach(e => {
+    const isAdoption = e.relType === 'adoption';
+    edges.push({
+      id: `rfe_${e.id}`,
+      source: e.source,
+      target: e.target,
+      type: isAdoption ? 'step' : 'smoothstep',
+      style: {
+        stroke: isAdoption ? '#22C55E' : '#3B82F6',
+        strokeWidth: 2,
+        strokeDasharray: isAdoption ? '5,5' : undefined,
+      },
+      markerEnd: { type: 'arrowclosed', color: isAdoption ? '#22C55E' : '#3B82F6' },
     });
   });
 
-  const nodes = persons.map(p => ({
-    id: p.id,
-    type: 'personNode',
-    position: positions[p.id] || { x: 0, y: 0 },
-    data: { ...p },
-  }));
-
-  const edgeColors = {
-    parent_child: '#3B82F6',
-    spouse:       '#EF4444',
-    adoption:     '#22C55E',
-    sibling:      '#A855F7',
-    other:        '#9CA3AF',
-  };
-
-  const edges = relationships.map(r => {
-    if (r.relation_type === 'sibling') {
-      const posA = positions[r.person_a_id];
-      const posB = positions[r.person_b_id];
-      const aIsLeft = !posA || !posB || posA.x <= posB.x;
-      return {
-        id: r.id,
-        source: r.person_a_id,
-        target: r.person_b_id,
-        sourceHandle: aIsLeft ? 'right' : 'left',
-        targetHandle: aIsLeft ? 'left' : 'right',
-        type: 'smoothstep',
-        style: { stroke: '#A855F7', strokeWidth: 2 },
-      };
-    }
-
-    return {
+  // Sibling (purple, horizontal)
+  siblingRels.forEach(r => {
+    const posA = positions[r.person_a_id];
+    const posB = positions[r.person_b_id];
+    const aIsLeft = !posA || !posB || posA.x <= posB.x;
+    edges.push({
       id: r.id,
       source: r.person_a_id,
       target: r.person_b_id,
-      type: r.relation_type === 'adoption' ? 'step' : 'smoothstep',
-      animated: r.relation_type === 'spouse',
-      style: {
-        stroke: edgeColors[r.relation_type] || '#9CA3AF',
-        strokeWidth: 2,
-        strokeDasharray: r.relation_type === 'adoption' ? '5,5' : undefined,
-      },
-      markerEnd: r.relation_type !== 'spouse' ? {
-        type: 'arrowclosed',
-        color: edgeColors[r.relation_type],
-      } : undefined,
-    };
+      sourceHandle: aIsLeft ? 'right' : 'left',
+      targetHandle: aIsLeft ? 'left' : 'right',
+      type: 'smoothstep',
+      style: { stroke: '#A855F7', strokeWidth: 2 },
+    });
+  });
+
+  // Other (grey, dashed)
+  otherRels.forEach(r => {
+    edges.push({
+      id: r.id,
+      source: r.person_a_id,
+      target: r.person_b_id,
+      type: 'smoothstep',
+      style: { stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '3,3' },
+    });
   });
 
   return { nodes, edges };

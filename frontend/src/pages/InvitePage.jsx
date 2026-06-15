@@ -7,9 +7,10 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import PersonNode from '../components/tree/PersonNode';
+import MarriageNode from '../components/tree/MarriageNode';
 import { buildGraphElements } from '../components/tree/treeLayout';
 
-const nodeTypes = { personNode: PersonNode };
+const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode };
 
 function TreeFlow({ persons, relationships, onNodeClick }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -17,11 +18,12 @@ function TreeFlow({ persons, relationships, onNodeClick }) {
   const { fitView } = useReactFlow();
 
   useEffect(() => {
-    const { nodes: n, edges: e } = buildGraphElements(persons, relationships);
-    setNodes(n);
-    setEdges(e);
-    setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
-  }, [persons, relationships]);
+    buildGraphElements(persons, relationships).then(({ nodes: n, edges: e }) => {
+      setNodes(n);
+      setEdges(e);
+      setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
+    });
+  }, [persons.length, relationships.length]);
 
   return (
     <ReactFlow

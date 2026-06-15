@@ -8,13 +8,14 @@ import ReactFlow, {
 import { io } from 'socket.io-client';
 import 'reactflow/dist/style.css';
 import PersonNode from '../components/tree/PersonNode';
+import MarriageNode from '../components/tree/MarriageNode';
 import { buildGraphElements } from '../components/tree/treeLayout';
 import { useAuthStore } from '../store/authStore';
 import api from '../services/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-const nodeTypes = { personNode: PersonNode };
+const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode };
 
 const TreeFlow = memo(function TreeFlow({ persons, relationships, onAddPerson }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -22,15 +23,14 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, onAddPerson })
   const { fitView } = useReactFlow();
 
   useEffect(() => {
-    const { nodes: n, edges: e } = buildGraphElements(persons, relationships);
-    // BUG-07: анімований перехід позицій існуючих вузлів
-    setNodes(n.map(node => ({
-      ...node,
-      style: { ...node.style, transition: 'all 0.35s ease' },
-    })));
-    setEdges(e);
-    // BUG-04: центрувати після рендеру
-    setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
+    buildGraphElements(persons, relationships).then(({ nodes: n, edges: e }) => {
+      setNodes(n.map(node => ({
+        ...node,
+        style: { ...node.style, transition: 'all 0.35s ease' },
+      })));
+      setEdges(e);
+      setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
+    });
   }, [persons.length, relationships.length]);
 
   return (
