@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
-  Background, Controls, MiniMap,
+  Background, MiniMap,
   useNodesState, useEdgesState, useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
@@ -24,20 +24,20 @@ const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode, familyGr
 const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, theme, toggleTheme }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const { fitView } = useReactFlow();
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   useEffect(() => {
     buildGraphElements(persons, relationships).then(({ nodes: n, edges: e }) => {
       setNodes(n.map(node => ({
         ...node,
-        style: { ...node.style, transition: 'all 0.35s ease' },
+        style: { ...node.style, transition: 'all 0.4s ease' },
       })));
       setEdges(e);
       setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
     });
   }, [layoutKey]);
 
-  const btnStyle = {
+  const btn = {
     width: 44, height: 44,
     background: 'var(--controls-bg)',
     border: '1px solid var(--controls-border)',
@@ -46,8 +46,9 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, the
     color: 'var(--controls-icon)',
     fontSize: 18,
     cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-    transition: 'all 0.15s',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    transition: 'opacity 0.15s',
+    userSelect: 'none',
   };
 
   return (
@@ -64,7 +65,7 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, the
       style={{ background: 'var(--bg-graph)' }}>
 
       <Background color="var(--graph-dot)" gap={24} size={1} />
-      <Controls style={{ bottom: 130, right: 12, top: 'auto' }} showInteractive={false} />
+
       <MiniMap
         style={{
           bottom: 130, left: 12, top: 'auto',
@@ -74,19 +75,19 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, the
         nodeColor={n => n.data.highlighted ? '#F59E0B' : n.data.is_alive ? 'var(--accent)' : 'var(--line-color)'}
         maskColor="var(--minimap-mask)" />
 
-      {/* Navigation buttons — bottom right */}
+      {/* Custom nav panel — bottom right (TZ v3 §5.2) */}
       <div style={{ position: 'absolute', bottom: 80, right: 12, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button
-          onClick={toggleTheme}
-          style={btnStyle}
-          title={theme === 'light' ? 'Темна тема' : 'Світла тема'}>
+        <button onClick={toggleTheme} style={btn} title={theme === 'light' ? 'Темна тема' : 'Світла тема'}>
           {theme === 'light' ? '🌙' : '☀️'}
         </button>
-        <button
-          onClick={() => fitView({ padding: 0.15, duration: 400 })}
-          style={btnStyle}
-          title="Показати все">
+        <button onClick={() => fitView({ padding: 0.15, duration: 400 })} style={btn} title="Показати все">
           ⊞
+        </button>
+        <button onClick={() => zoomIn({ duration: 200 })} style={btn} title="Збільшити">
+          +
+        </button>
+        <button onClick={() => zoomOut({ duration: 200 })} style={btn} title="Зменшити">
+          −
         </button>
       </div>
     </ReactFlow>

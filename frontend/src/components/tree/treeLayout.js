@@ -311,32 +311,34 @@ export async function buildGraphElements(persons, relationships) {
     })),
   ];
 
-  // ── React Flow edges ────────────────────────────────────────────────────
+  // ── React Flow edges (FS style: thin gray, no arrows) ──────────────────
   const edges = [];
 
+  const lineStyle = { stroke: 'var(--line-color)', strokeWidth: 1.5 };
+
+  // Spouse → marriage connector
   marriageDefs.forEach(m => {
     edges.push(
-      { id: `rfe_${m.id}_a`, source: m.personA, target: m.id, type: 'smoothstep', style: { stroke: '#EF4444', strokeWidth: 2 } },
-      { id: `rfe_${m.id}_b`, source: m.personB, target: m.id, type: 'smoothstep', style: { stroke: '#EF4444', strokeWidth: 2 } },
+      { id: `rfe_${m.id}_a`, source: m.personA, target: m.id, type: 'smoothstep', style: lineStyle },
+      { id: `rfe_${m.id}_b`, source: m.personB, target: m.id, type: 'smoothstep', style: lineStyle },
     );
   });
 
+  // Parent / marriage node → child
   pcEdges.forEach(e => {
     const isAdoption = e.relType === 'adoption';
     edges.push({
       id: `rfe_${e.id}`,
       source: e.source,
       target: e.target,
-      type: isAdoption ? 'step' : 'smoothstep',
-      style: {
-        stroke: isAdoption ? '#22C55E' : '#3B82F6',
-        strokeWidth: 2,
-        strokeDasharray: isAdoption ? '5,5' : undefined,
-      },
-      markerEnd: { type: 'arrowclosed', color: isAdoption ? '#22C55E' : '#3B82F6' },
+      type: 'smoothstep',
+      style: isAdoption
+        ? { ...lineStyle, strokeDasharray: '6,4' }
+        : lineStyle,
     });
   });
 
+  // Sibling — horizontal, slightly darker dash to distinguish
   siblingRels.forEach(r => {
     const posA = positions[r.person_a_id];
     const posB = positions[r.person_b_id];
@@ -348,17 +350,18 @@ export async function buildGraphElements(persons, relationships) {
       sourceHandle: aIsLeft ? 'right' : 'left',
       targetHandle: aIsLeft ? 'left' : 'right',
       type: 'smoothstep',
-      style: { stroke: '#A855F7', strokeWidth: 2 },
+      style: { ...lineStyle, strokeDasharray: '4,3' },
     });
   });
 
+  // Other — faint dashed
   otherRels.forEach(r => {
     edges.push({
       id: r.id,
       source: r.person_a_id,
       target: r.person_b_id,
       type: 'smoothstep',
-      style: { stroke: '#9CA3AF', strokeWidth: 1, strokeDasharray: '3,3' },
+      style: { stroke: 'var(--line-color)', strokeWidth: 1, strokeDasharray: '3,5', opacity: 0.5 },
     });
   });
 
