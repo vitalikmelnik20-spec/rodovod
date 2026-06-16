@@ -2,78 +2,109 @@ import { memo } from 'react';
 import { Handle, Position, useViewport } from 'reactflow';
 import { useNavigate, useParams } from 'react-router-dom';
 
+const AVATAR_COLORS = [
+  '#1565C0', '#2E7D32', '#6A1B9A', '#AD1457',
+  '#E65100', '#00695C', '#283593', '#4E342E',
+];
+
+function getAvatarColor(seed = '') {
+  let hash = 0;
+  for (const c of seed) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+const handleBase = {
+  background: 'var(--line-color)',
+  width: 8,
+  height: 8,
+  border: 'none',
+};
+
 function PersonNode({ data }) {
   const navigate = useNavigate();
   const { id: treeId } = useParams();
   const { zoom } = useViewport();
 
+  const fullName = [data.first_name, data.last_name].filter(Boolean).join(' ');
   const initials = [data.first_name, data.last_name]
     .filter(Boolean).map(s => s[0]).join('') || '?';
+  const avatarColor = getAvatarColor(fullName || String(data.id));
 
-  const year = data.birth_date ? new Date(data.birth_date).getFullYear() : null;
+  const birthYear = data.birth_date ? new Date(data.birth_date).getFullYear() : null;
   const deathYear = data.death_date ? new Date(data.death_date).getFullYear() : null;
-
-  const handleColor = !data.is_alive ? '#475569'
-    : data.gender === 'male' ? '#3B82F6'
-    : data.gender === 'female' ? '#EC4899'
-    : '#0EA5E9';
-
-  const handleStyle = { background: handleColor, width: 8, height: 8 };
-
-  const bgGradient = !data.is_alive
-    ? 'linear-gradient(135deg, #1e293b, #334155)'
-    : data.gender === 'male'
-      ? 'linear-gradient(135deg, #1e3a8a, #1d4ed8)'
-      : data.gender === 'female'
-        ? 'linear-gradient(135deg, #831843, #be185d)'
-        : 'linear-gradient(135deg, #164e63, #0e7490)';
+  const yearsLabel = birthYear
+    ? (deathYear ? `${birthYear} — ${deathYear}` : `${birthYear} —`)
+    : null;
 
   const handles = (
     <>
-      <Handle type="target" position={Position.Top} style={handleStyle} />
-      <Handle type="source" id="left" position={Position.Left} style={{ ...handleStyle, top: '50%' }} />
-      <Handle type="source" id="right" position={Position.Right} style={{ ...handleStyle, top: '50%' }} />
-      <Handle type="source" position={Position.Bottom} style={handleStyle} />
+      <Handle type="target" position={Position.Top}    style={handleBase} />
+      <Handle type="source" id="left"  position={Position.Left}  style={{ ...handleBase, top: '50%' }} />
+      <Handle type="source" id="right" position={Position.Right} style={{ ...handleBase, top: '50%' }} />
+      <Handle type="source" position={Position.Bottom} style={handleBase} />
     </>
   );
 
-  const highlightRing = data.highlighted ? '0 0 0 3px #F59E0B, 0 0 12px #F59E0B80' : undefined;
-
-  // 4.5 LOD — dot view at very low zoom
+  // ── Dot view (zoom < 0.4) ───────────────────────────────────────────────
   if (zoom < 0.4) {
     return (
       <>
         {handles}
         <div
           onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
-          style={{ width: 28, height: 28, borderRadius: '50%', background: bgGradient,
-            border: `2px solid ${data.highlighted ? '#F59E0B' : handleColor}`,
-            boxShadow: highlightRing,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            background: avatarColor,
+            border: data.highlighted ? '2px solid #F59E0B' : '2px solid var(--card-border)',
+            boxShadow: data.highlighted ? '0 0 0 3px #F59E0B60' : undefined,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
         >
-          <span style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>{initials}</span>
+          <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>{initials}</span>
         </div>
       </>
     );
   }
 
-  // 4.5 LOD — compact view at medium zoom
+  // ── Compact view (zoom 0.4–0.7) ────────────────────────────────────────
   if (zoom < 0.7) {
     return (
       <>
         {handles}
         <div
           onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
-          className="person-node bg-slate-800 border-2 rounded-xl overflow-hidden cursor-pointer select-none"
-          style={{ width: 90, borderColor: data.highlighted ? '#F59E0B' : handleColor, boxShadow: highlightRing }}
+          className="person-node"
+          style={{
+            width: 110,
+            background: 'var(--card-bg)',
+            border: data.highlighted ? '2px solid #F59E0B' : '1px solid var(--card-border)',
+            boxShadow: data.highlighted ? '0 0 0 3px #F59E0B40' : 'var(--card-shadow)',
+            borderRadius: 10,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '10px 8px 8px',
+            cursor: 'pointer',
+            userSelect: 'none',
+            opacity: !data.is_alive ? 0.8 : 1,
+          }}
         >
-          <div style={{ height: 55, background: bgGradient, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%', overflow: 'hidden',
+            marginBottom: 6, background: avatarColor, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
             {data.avatar_url
               ? <img src={data.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span className="text-white text-xl font-bold">{initials}</span>
+              : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>{initials}</span>
             }
           </div>
-          <p className="text-white text-xs font-bold truncate px-1.5 py-1 text-center">
+          <p style={{
+            color: 'var(--text-primary)', fontSize: 11, fontWeight: 600,
+            textAlign: 'center', lineHeight: 1.2,
+            overflow: 'hidden', maxHeight: 26,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            width: '100%',
+          }}>
             {data.first_name || data.last_name || '?'}
           </p>
         </div>
@@ -81,42 +112,92 @@ function PersonNode({ data }) {
     );
   }
 
-  // Full view
+  // ── Full view 160×200 (zoom ≥ 0.7) ────────────────────────────────────
+  const border = data.highlighted
+    ? '2px solid #F59E0B'
+    : data.is_me
+      ? '2px solid var(--accent)'
+      : '1px solid var(--card-border)';
+
+  const shadow = data.highlighted
+    ? '0 0 0 3px #F59E0B40, var(--card-shadow)'
+    : data.is_me
+      ? '0 0 0 3px var(--accent-ring), var(--card-shadow)'
+      : 'var(--card-shadow)';
+
   return (
     <>
       {handles}
-      <div onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
-        className="person-node bg-slate-800 border-2 rounded-2xl overflow-hidden cursor-pointer active:scale-95 transition-all select-none"
+      <div
+        onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
+        className="person-node"
         style={{
-          width: 110,
-          borderColor: handleColor,
-          boxShadow: data.highlighted ? '0 0 0 3px #F59E0B, 0 0 16px #F59E0B80' : '0 4px 20px rgba(0,0,0,0.5)',
+          width: 160,
+          minHeight: 200,
+          background: 'var(--card-bg)',
+          border,
+          borderRadius: 12,
+          boxShadow: shadow,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          padding: '16px 12px',
+          cursor: 'pointer',
+          userSelect: 'none',
+          opacity: !data.is_alive ? 0.8 : 1,
+          transition: 'box-shadow 0.2s, border-color 0.2s',
+        }}
+      >
+        {/* Avatar 80px */}
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%', overflow: 'hidden',
+          marginBottom: 12, background: avatarColor, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative',
         }}>
-
-        <div className="relative w-full" style={{ height: 80 }}>
-          {data.avatar_url ? (
-            <img src={data.avatar_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center" style={{ background: bgGradient }}>
-              <span className="text-white text-2xl font-bold">{initials}</span>
-            </div>
-          )}
-          <div className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border border-slate-800 ${data.is_alive ? 'bg-green-400' : 'bg-slate-500'}`} />
+          {data.avatar_url
+            ? <img src={data.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ color: '#fff', fontSize: 28, fontWeight: 700 }}>{initials}</span>
+          }
+          {/* alive / deceased dot */}
+          <div style={{
+            position: 'absolute', bottom: 3, right: 3,
+            width: 11, height: 11, borderRadius: '50%',
+            background: data.is_alive ? '#4CAF50' : 'var(--text-secondary)',
+            border: '1.5px solid var(--card-bg)',
+          }} />
         </div>
 
-        <div className="px-2 py-1.5 text-center">
-          <p className="text-white text-xs font-bold leading-tight truncate">
-            {data.first_name || data.last_name || 'Без імені'}
+        {/* First name + patronymic */}
+        <p style={{
+          color: 'var(--text-primary)', fontSize: 14, fontWeight: 600,
+          textAlign: 'center', lineHeight: 1.3,
+          overflow: 'hidden', display: '-webkit-box',
+          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          width: '100%', wordBreak: 'break-word',
+        }}>
+          {[data.first_name, data.patronymic].filter(Boolean).join(' ') || '—'}
+        </p>
+
+        {/* Last name */}
+        {data.last_name && (
+          <p style={{
+            color: 'var(--text-secondary)', fontSize: 13,
+            textAlign: 'center', marginTop: 2,
+            overflow: 'hidden', textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap', width: '100%',
+          }}>
+            {data.last_name}
           </p>
-          {data.last_name && data.first_name && (
-            <p className="text-slate-400 text-xs truncate">{data.last_name}</p>
-          )}
-          {year && (
-            <p className="text-slate-500 text-xs mt-0.5">
-              {year}{deathYear ? ` — ${deathYear}` : ''}
-            </p>
-          )}
-        </div>
+        )}
+
+        {/* Years */}
+        {yearsLabel && (
+          <p style={{
+            color: 'var(--text-secondary)', fontSize: 12,
+            textAlign: 'center', marginTop: 4,
+          }}>
+            {yearsLabel}
+          </p>
+        )}
       </div>
     </>
   );

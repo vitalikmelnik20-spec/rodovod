@@ -2,8 +2,8 @@ import ELK from 'elkjs/lib/elk.bundled.js';
 
 const elk = new ELK();
 
-const NODE_W = 110;
-const NODE_H = 130;
+const NODE_W = 160;
+const NODE_H = 200;
 const GROUP_PAD = 28;
 const LABEL_H = 24;
 
