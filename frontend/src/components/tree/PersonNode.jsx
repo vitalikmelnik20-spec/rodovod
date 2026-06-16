@@ -128,75 +128,98 @@ function PersonNode({ data }) {
   return (
     <>
       {handles}
-      <div
-        onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
-        className="person-node"
-        style={{
-          width: 160,
-          minHeight: 200,
-          background: 'var(--card-bg)',
-          border,
-          borderRadius: 12,
-          boxShadow: shadow,
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          padding: '16px 12px',
-          cursor: 'pointer',
-          userSelect: 'none',
-          opacity: !data.is_alive ? 0.8 : 1,
-          transition: 'box-shadow 0.2s, border-color 0.2s',
-        }}
-      >
-        {/* Avatar 80px */}
-        <div style={{
-          width: 80, height: 80, borderRadius: '50%', overflow: 'hidden',
-          marginBottom: 12, background: avatarColor, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          position: 'relative',
-        }}>
-          {data.avatar_url
-            ? <img src={data.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ color: '#fff', fontSize: 28, fontWeight: 700 }}>{initials}</span>
-          }
-          {/* alive / deceased dot */}
+      <div style={{ position: 'relative', width: 160 }}>
+        <div
+          onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
+          className="person-node"
+          style={{
+            width: 160,
+            minHeight: 200,
+            background: 'var(--card-bg)',
+            border,
+            borderRadius: 12,
+            boxShadow: shadow,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '16px 12px',
+            cursor: 'pointer',
+            userSelect: 'none',
+            opacity: !data.is_alive ? 0.8 : 1,
+            transition: 'box-shadow 0.2s, border-color 0.2s',
+          }}
+        >
+          {/* Avatar 80px */}
           <div style={{
-            position: 'absolute', bottom: 3, right: 3,
-            width: 11, height: 11, borderRadius: '50%',
-            background: data.is_alive ? '#4CAF50' : 'var(--text-secondary)',
-            border: '1.5px solid var(--card-bg)',
-          }} />
+            width: 80, height: 80, borderRadius: '50%', overflow: 'hidden',
+            marginBottom: 12, background: avatarColor, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative',
+          }}>
+            {data.avatar_url
+              ? <img src={data.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ color: '#fff', fontSize: 28, fontWeight: 700 }}>{initials}</span>
+            }
+            <div style={{
+              position: 'absolute', bottom: 3, right: 3,
+              width: 11, height: 11, borderRadius: '50%',
+              background: data.is_alive ? '#4CAF50' : 'var(--text-secondary)',
+              border: '1.5px solid var(--card-bg)',
+            }} />
+          </div>
+
+          <p style={{
+            color: 'var(--text-primary)', fontSize: 14, fontWeight: 600,
+            textAlign: 'center', lineHeight: 1.3,
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            width: '100%', wordBreak: 'break-word',
+          }}>
+            {[data.first_name, data.patronymic].filter(Boolean).join(' ') || '—'}
+          </p>
+
+          {data.last_name && (
+            <p style={{
+              color: 'var(--text-secondary)', fontSize: 13,
+              textAlign: 'center', marginTop: 2,
+              overflow: 'hidden', textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap', width: '100%',
+            }}>
+              {data.last_name}
+            </p>
+          )}
+
+          {yearsLabel && (
+            <p style={{ color: 'var(--text-secondary)', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+              {yearsLabel}
+            </p>
+          )}
         </div>
 
-        {/* First name + patronymic */}
-        <p style={{
-          color: 'var(--text-primary)', fontSize: 14, fontWeight: 600,
-          textAlign: 'center', lineHeight: 1.3,
-          overflow: 'hidden', display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          width: '100%', wordBreak: 'break-word',
-        }}>
-          {[data.first_name, data.patronymic].filter(Boolean).join(' ') || '—'}
-        </p>
-
-        {/* Last name */}
-        {data.last_name && (
-          <p style={{
-            color: 'var(--text-secondary)', fontSize: 13,
-            textAlign: 'center', marginTop: 2,
-            overflow: 'hidden', textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap', width: '100%',
-          }}>
-            {data.last_name}
-          </p>
-        )}
-
-        {/* Years */}
-        {yearsLabel && (
-          <p style={{
-            color: 'var(--text-secondary)', fontSize: 12,
-            textAlign: 'center', marginTop: 4,
-          }}>
-            {yearsLabel}
-          </p>
+        {/* ── «+» button — add relative ────────────────────────────────── */}
+        {data.onAddRelative && (
+          <button
+            onClick={e => { e.stopPropagation(); data.onAddRelative(data.id); }}
+            style={{
+              position: 'absolute',
+              bottom: -14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 28, height: 28,
+              borderRadius: '50%',
+              background: 'var(--accent)',
+              color: '#fff',
+              fontSize: 20,
+              fontWeight: 300,
+              lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '2px solid var(--card-bg)',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              zIndex: 10,
+            }}
+            title="Додати родича"
+          >
+            +
+          </button>
         )}
       </div>
     </>

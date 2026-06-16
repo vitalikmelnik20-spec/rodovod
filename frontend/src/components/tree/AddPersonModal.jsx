@@ -28,7 +28,10 @@ async function compressImage(file) {
   });
 }
 
-export default function AddPersonModal({ treeId, allPersons, onClose, onCreated }) {
+// prefillRel: { person, relType, isReversed? }
+// isReversed=true means the existing person is person_a (parent/source),
+// and the new person becomes person_b (child/target) in the relationship.
+export default function AddPersonModal({ treeId, allPersons, onClose, onCreated, prefillRel }) {
   const [form, setForm] = useState({
     last_name: '', first_name: '', patronymic: '',
     gender: '', is_alive: true,
@@ -37,7 +40,9 @@ export default function AddPersonModal({ treeId, allPersons, onClose, onCreated 
     biography: '',
   });
   const [photo, setPhoto] = useState(null);
-  const [rels, setRels] = useState([]);
+  const [rels, setRels] = useState(() =>
+    prefillRel ? [prefillRel] : []
+  );
   const [showRelPicker, setShowRelPicker] = useState(false);
   const [relSearch, setRelSearch] = useState('');
   const [pickedPerson, setPickedPerson] = useState(null);
@@ -80,8 +85,8 @@ export default function AddPersonModal({ treeId, allPersons, onClose, onCreated 
 
       for (const rel of rels) {
         await api.post(`/trees/${treeId}/relationships`, {
-          person_a_id: pid,
-          person_b_id: rel.person.id,
+          person_a_id: rel.isReversed ? rel.person.id : pid,
+          person_b_id: rel.isReversed ? pid : rel.person.id,
           relation_type: rel.relType,
         });
       }
@@ -235,16 +240,19 @@ export default function AddPersonModal({ treeId, allPersons, onClose, onCreated 
           {rels.map((r, i) => {
             const n = [r.person.last_name, r.person.first_name].filter(Boolean).join(' ') || 'Без імені';
             const typeLabel = REL_TYPES.find(t => t.key === r.relType)?.label || r.relType;
+            const isPrefill = i === 0 && !!prefillRel;
             return (
               <div key={i} className="flex items-center gap-2 mb-2">
-                <div className="flex-1 bg-slate-800 rounded-xl px-3 py-2.5">
+                <div className={`flex-1 rounded-xl px-3 py-2.5 ${isPrefill ? 'bg-blue-900/40 border border-blue-700/40' : 'bg-slate-800'}`}>
                   <p className="text-white text-sm font-medium">{n}</p>
                   <p className="text-slate-400 text-xs mt-0.5">{typeLabel}</p>
                 </div>
-                <button onClick={() => setRels(prev => prev.filter((_, j) => j !== i))}
-                  className="w-9 h-9 flex items-center justify-center text-slate-500 active:scale-90 transition-all text-lg">
-                  ×
-                </button>
+                {!isPrefill && (
+                  <button onClick={() => setRels(prev => prev.filter((_, j) => j !== i))}
+                    className="w-9 h-9 flex items-center justify-center text-slate-500 active:scale-90 transition-all text-lg">
+                    ×
+                  </button>
+                )}
               </div>
             );
           })}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, memo } from 'react';
+import { useEffect, useRef, useState, useMemo, memo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Background, MiniMap,
@@ -21,7 +21,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode, familyGroup: FamilyGroupNode };
 
 // layoutKey triggers full graph rebuild: count + filter state + highlight
-const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, theme, toggleTheme }) {
+const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, theme, toggleTheme, onAddRelative }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
@@ -31,11 +31,12 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, the
       setNodes(n.map(node => ({
         ...node,
         style: { ...node.style, transition: 'all 0.4s ease' },
+        data: { ...node.data, onAddRelative },
       })));
       setEdges(e);
       setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
     });
-  }, [layoutKey]);
+  }, [layoutKey, onAddRelative]);
 
   const btn = {
     width: 44, height: 44,
@@ -94,6 +95,14 @@ const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, the
   );
 });
 
+// Relationship options shown in the context sheet
+const REL_OPTIONS = [
+  { label: '👨 Батько',           relType: 'parent_child', isReversed: false, gender: 'male'   },
+  { label: '👩 Мати',             relType: 'parent_child', isReversed: false, gender: 'female' },
+  { label: '👶 Дитина',           relType: 'parent_child', isReversed: true,  gender: ''       },
+  { label: '💍 Чоловік / Дружина', relType: 'spouse',       isReversed: false, gender: ''       },
+];
+
 export default function TreePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -104,6 +113,8 @@ export default function TreePage() {
   const [relationships, setRelationships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalPrefill, setAddModalPrefill] = useState(null);   // { person, relType, isReversed }
+  const [addRelativePersonId, setAddRelativePersonId] = useState(null); // personId for context sheet
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   // Filters: 'all' | 'alive' | 'deceased'
   const [statusFilter, setStatusFilter] = useState('all');
@@ -169,6 +180,19 @@ export default function TreePage() {
     setHighlightTag('');
   }
 
+  // «+» button callback — stable reference so nodes don't re-render
+  const handleAddRelative = useCallback((personId) => {
+    setAddRelativePersonId(personId);
+  }, []);
+
+  function openAddWithContext(opt) {
+    const person = persons.find(p => p.id === addRelativePersonId);
+    if (!person) return;
+    setAddRelativePersonId(null);
+    setAddModalPrefill({ person, relType: opt.relType, isReversed: opt.isReversed });
+    setShowAddModal(true);
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-slate-900">
       <div className="text-5xl animate-pulse">🌳</div>
@@ -232,7 +256,7 @@ export default function TreePage() {
           </div>
         ) : (
           <ReactFlowProvider>
-            <TreeFlow persons={filteredPersons} relationships={relationships} layoutKey={layoutKey} theme={theme} toggleTheme={toggleTheme} />
+            <TreeFlow persons={filteredPersons} relationships={relationships} layoutKey={layoutKey} theme={theme} toggleTheme={toggleTheme} onAddRelative={handleAddRelative} />
           </ReactFlowProvider>
         )}
       </div>
@@ -307,13 +331,51 @@ export default function TreePage() {
         </div>
       )}
 
-      {/* Full-screen add person form (5.1) */}
+      {/* ── Context sheet: choose relationship type for «+» button ─────── */}
+      {addRelativePersonId && (
+        <div className="absolute inset-0 z-50 flex items-end bg-black/60"
+          onClick={e => e.target === e.currentTarget && setAddRelativePersonId(null)}>
+          <div className="w-full bg-slate-900 rounded-t-3xl border-t border-slate-700"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
+            <div className="px-5 pt-4 pb-5">
+              <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-5" />
+              <h3 className="text-white font-bold text-lg mb-1">Додати родича</h3>
+              <p className="text-slate-400 text-xs mb-5">
+                Ким є нова людина для&nbsp;
+                <span className="text-white font-medium">
+                  {persons.find(p => p.id === addRelativePersonId)?.first_name || 'цієї особи'}
+                </span>?
+              </p>
+              <div className="flex flex-col gap-2">
+                {REL_OPTIONS.map(opt => (
+                  <button key={opt.label} onClick={() => openAddWithContext(opt)}
+                    className="flex items-center gap-3 bg-slate-800 rounded-2xl px-4 py-3.5 text-white text-sm font-medium active:scale-95 transition-all text-left">
+                    <span className="text-xl">{opt.label.split(' ')[0]}</span>
+                    <span>{opt.label.split(' ').slice(1).join(' ')}</span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setAddRelativePersonId(null)}
+                className="w-full mt-4 text-slate-500 text-sm py-2 active:opacity-60">
+                Скасувати
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-screen add person form */}
       {showAddModal && (
         <AddPersonModal
           treeId={id}
           allPersons={persons}
-          onClose={() => setShowAddModal(false)}
-          onCreated={(p) => { setPersons(prev => [...prev, p]); setShowAddModal(false); }}
+          prefillRel={addModalPrefill}
+          onClose={() => { setShowAddModal(false); setAddModalPrefill(null); }}
+          onCreated={(p) => {
+            setPersons(prev => [...prev, p]);
+            setShowAddModal(false);
+            setAddModalPrefill(null);
+          }}
         />
       )}
     </div>
