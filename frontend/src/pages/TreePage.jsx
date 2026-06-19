@@ -21,20 +21,68 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 const nodeTypes = { personNode: PersonNode, marriageNode: MarriageNode, familyGroup: FamilyGroupNode };
 
 // layoutKey triggers full graph rebuild: count + filter state + highlight
-const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, theme, toggleTheme, onAddRelative }) {
+// ── Skeleton loader ──────────────────────────────────────────────────────
+function SkeletonCard() {
+  const s = { background: 'var(--card-border)', borderRadius: 6, animation: 'skeletonPulse 1.5s ease-in-out infinite' };
+  return (
+    <div style={{
+      width: 160, height: 200,
+      background: 'var(--card-bg)', border: '1px solid var(--card-border)',
+      borderRadius: 12, padding: 16,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+      animation: 'skeletonPulse 1.5s ease-in-out infinite',
+    }}>
+      <div style={{ width: 80, height: 80, borderRadius: '50%', ...s }} />
+      <div style={{ width: '75%', height: 14, ...s }} />
+      <div style={{ width: '55%', height: 12, ...s }} />
+    </div>
+  );
+}
+
+function SkeletonGraph() {
+  const line = { background: 'var(--card-border)', animation: 'skeletonPulse 1.5s ease-in-out infinite' };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+      <div style={{ display: 'flex', gap: 24 }}>
+        <SkeletonCard /><SkeletonCard />
+      </div>
+      <div style={{ display: 'flex', gap: 80 }}>
+        <div style={{ width: 2, height: 40, ...line }} />
+        <div style={{ width: 2, height: 40, ...line }} />
+      </div>
+      <div style={{ display: 'flex', gap: 24 }}>
+        <SkeletonCard /><SkeletonCard /><SkeletonCard />
+      </div>
+    </div>
+  );
+}
+
+const TreeFlow = memo(function TreeFlow({ persons, relationships, layoutKey, theme, toggleTheme, onAddRelative, newPersonIds }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   useEffect(() => {
     buildGraphElements(persons, relationships).then(({ nodes: n, edges: e }) => {
+      const currentNewIds = newPersonIds.current;
       setNodes(n.map(node => ({
         ...node,
+        className: currentNewIds.has(node.id) ? 'node-appear' : undefined,
         style: { ...node.style, transition: 'all 0.4s ease' },
         data: { ...node.data, onAddRelative },
       })));
       setEdges(e);
-      setTimeout(() => fitView({ padding: 0.3, duration: 500 }), 100);
+      setTimeout(() => fitView({ padding: 0.3, duration: 400 }), 100);
+
+      // Remove animation class after it completes
+      if (currentNewIds.size > 0) {
+        setTimeout(() => {
+          setNodes(prev => prev.map(node =>
+            currentNewIds.has(node.id) ? { ...node, className: undefined } : node
+          ));
+          currentNewIds.clear();
+        }, 350);
+      }
     });
   }, [layoutKey, onAddRelative]);
 
@@ -120,6 +168,7 @@ export default function TreePage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [highlightTag, setHighlightTag] = useState('');
   const socketRef = useRef(null);
+  const newPersonIdsRef = useRef(new Set());
 
   useEffect(() => { loadAll(); }, [id]);
 
@@ -127,7 +176,10 @@ export default function TreePage() {
     const socket = io(API_BASE, { auth: { token } });
     socketRef.current = socket;
     socket.emit('join-tree', id);
-    socket.on('person:created', (p) => setPersons(prev => [...prev, p]));
+    socket.on('person:created', (p) => {
+      newPersonIdsRef.current.add(p.id);
+      setPersons(prev => [...prev, p]);
+    });
     socket.on('person:updated', (p) => setPersons(prev => prev.map(x => x.id === p.id ? p : x)));
     socket.on('person:deleted', ({ id: pid }) => setPersons(prev => prev.filter(x => x.id !== pid)));
     return () => { socket.emit('leave-tree', id); socket.disconnect(); };
@@ -194,8 +246,9 @@ export default function TreePage() {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center h-screen bg-slate-900">
-      <div className="text-5xl animate-pulse">🌳</div>
+    <div className="flex items-center justify-center h-screen"
+      style={{ background: 'var(--bg-graph)' }}>
+      <SkeletonGraph />
     </div>
   );
 
@@ -256,7 +309,7 @@ export default function TreePage() {
           </div>
         ) : (
           <ReactFlowProvider>
-            <TreeFlow persons={filteredPersons} relationships={relationships} layoutKey={layoutKey} theme={theme} toggleTheme={toggleTheme} onAddRelative={handleAddRelative} />
+            <TreeFlow persons={filteredPersons} relationships={relationships} layoutKey={layoutKey} theme={theme} toggleTheme={toggleTheme} onAddRelative={handleAddRelative} newPersonIds={newPersonIdsRef} />
           </ReactFlowProvider>
         )}
       </div>
@@ -372,6 +425,7 @@ export default function TreePage() {
           prefillRel={addModalPrefill}
           onClose={() => { setShowAddModal(false); setAddModalPrefill(null); }}
           onCreated={(p) => {
+            newPersonIdsRef.current.add(p.id);
             setPersons(prev => [...prev, p]);
             setShowAddModal(false);
             setAddModalPrefill(null);

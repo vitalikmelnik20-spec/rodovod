@@ -121,14 +121,37 @@ html, body, #root {
 }
 .bottom-sheet-enter { animation: slideUp 0.25s ease-out; }
 
+/* New node appear (TZ v3 §8) */
 @keyframes nodeAppear {
   from { opacity: 0; transform: scale(0.8); }
   to   { opacity: 1; transform: scale(1); }
 }
 .node-appear { animation: nodeAppear 0.3s ease forwards; }
 
-/* Плавне переміщення при layout update */
+/* Skeleton pulse */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* Graph fade-in after first load */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.graph-fadein { animation: fadeIn 0.4s ease forwards; }
+
+/* Layout transition — smooth node movement */
 .react-flow__node { transition: transform 0.4s ease; }
+
+/* ReactFlow background adapts to theme */
+.react-flow { transition: background-color 0.3s ease; }
+
+/* Card hover — only when not highlighted / is-me */
+.person-node:not([data-highlighted]):not([data-is-me]):hover {
+  box-shadow: var(--card-shadow-hover) !important;
+  border-color: var(--accent) !important;
+}
 
 button:active { transform: scale(0.97); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

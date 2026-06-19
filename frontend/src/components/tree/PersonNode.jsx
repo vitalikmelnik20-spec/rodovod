@@ -132,6 +132,8 @@ function PersonNode({ data }) {
         <div
           onClick={() => navigate(`/tree/${treeId}/person/${data.id}`)}
           className="person-node"
+          data-highlighted={data.highlighted || undefined}
+          data-is-me={data.is_me || undefined}
           style={{
             width: 160,
             minHeight: 200,
@@ -144,7 +146,7 @@ function PersonNode({ data }) {
             cursor: 'pointer',
             userSelect: 'none',
             opacity: !data.is_alive ? 0.8 : 1,
-            transition: 'box-shadow 0.2s, border-color 0.2s',
+            transition: 'box-shadow 0.2s, border-color 0.2s, background-color 0.3s',
           }}
         >
           {/* Avatar 80px */}
